@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "89578726597",
+    "project_id": "agrich-app-v2",
+    "storage_bucket": "agrich-app-v2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:89578726597:android:9ff47f8089730df2fdfcac",
+        "android_client_info": {
+          "package_name": "com.example.agrich_app_v2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhstJTwQ1zeprxcp84vJJOkyatAF55yFI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

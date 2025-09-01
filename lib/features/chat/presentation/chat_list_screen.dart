@@ -7,7 +7,6 @@ import 'package:timeago/timeago.dart' as timeago;
 
 import '../../../core/router/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/router/app_router.dart';
 
 import '../../auth/providers/auth_provider.dart';
 import '../../shared/widgets/custom_input_field.dart';
@@ -16,7 +15,7 @@ import '../../shared/widgets/loading_indicator.dart';
 import 'providers/chat_provider.dart';
 
 class ChatListScreen extends ConsumerStatefulWidget {
-  const ChatListScreen({Key? key}) : super(key: key);
+  const ChatListScreen({super.key});
 
   @override
   ConsumerState<ChatListScreen> createState() => _ChatListScreenState();
@@ -47,6 +46,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
         : const AsyncValue<List<Map<String, dynamic>>>.data([]);
 
     return GradientBackground(
+      floatingActionButton: _buildFloatingActionButton(context),
       child: SafeArea(
         child: Column(
           children: [
@@ -64,7 +64,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
           ],
         ),
       ),
-      floatingActionButton: _buildFloatingActionButton(context),
     );
   }
 
@@ -78,7 +77,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
@@ -102,7 +101,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
                   Text(
                     'Connect with the farming community',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                     ),
                   ),
                 ],
@@ -114,7 +113,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
               },
               icon: Icon(
                 Icons.more_vert,
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha: 0.8),
               ),
             ),
           ],
@@ -148,7 +147,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
       onRefresh: () async {
         final currentUser = ref.read(currentUserProvider);
         if (currentUser != null) {
-          ref.refresh(userChatsProvider(currentUser.uid));
+          ref.invalidate(userChatsProvider(currentUser.uid));
         }
         await Future.delayed(const Duration(seconds: 1));
       },
@@ -200,7 +199,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
               children: [
                 CircleAvatar(
                   radius: 28,
-                  backgroundColor: AppColors.primaryGreen.withOpacity(0.2),
+                  backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.2),
                   backgroundImage: recipientAvatar.isNotEmpty
                       ? CachedNetworkImageProvider(recipientAvatar)
                       : null,
@@ -322,13 +321,13 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
                 width: 120,
                 height: 120,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(60),
                 ),
                 child: Icon(
                   Icons.chat_bubble_outline,
                   size: 60,
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                 ),
               ),
               const SizedBox(height: 24),
@@ -343,7 +342,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
               Text(
                 'Start connecting with fellow farmers in the community to begin chatting!',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -397,13 +396,13 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
                 width: 120,
                 height: 120,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(60),
                 ),
                 child: Icon(
                   Icons.error_outline,
                   size: 60,
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                 ),
               ),
               const SizedBox(height: 24),
@@ -418,7 +417,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
               Text(
                 'Unable to load your conversations. Please check your internet connection and try again.',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -427,7 +426,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
                 onPressed: () {
                   final currentUser = ref.read(currentUserProvider);
                   if (currentUser != null) {
-                    ref.refresh(userChatsProvider(currentUser.uid));
+                    ref.invalidate(userChatsProvider(currentUser.uid));
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -495,7 +494,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
 }
 
 class ChatShimmer extends StatelessWidget {
-  const ChatShimmer({Key? key}) : super(key: key);
+  const ChatShimmer({super.key});
 
   @override
   Widget build(BuildContext context) {

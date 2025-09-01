@@ -1,0 +1,1 @@
+{"flutter":{"platforms":{"dart":{"lib/firebase_options.dart":{"projectId":"agrich-app-v2","configurations":{"android":"1:89578726597:android:9ff47f8089730df2fdfcac","ios":"1:89578726597:ios:db08647eb4b631ecfdfcac"}}},"android":{"default":{"projectId":"agrich-app-v2","appId":"1:89578726597:android:9ff47f8089730df2fdfcac","fileOutput":"android/app/google-services.json"}}}}}

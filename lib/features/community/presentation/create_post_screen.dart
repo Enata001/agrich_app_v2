@@ -136,17 +136,17 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withOpacity(0.3),
+          color: Colors.white.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 25,
-            backgroundColor: AppColors.primaryGreen.withOpacity(0.2),
+            backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.2),
             child: Text(
               username.isNotEmpty ? username[0].toUpperCase() : 'U',
               style: const TextStyle(
@@ -172,7 +172,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                   Text(
                     email,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                     ),
                   ),
               ],
@@ -274,7 +274,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                 },
                 icon: const Icon(Icons.close, size: 20),
                 style: IconButton.styleFrom(
-                  backgroundColor: AppColors.error.withOpacity(0.1),
+                  backgroundColor: AppColors.error.withValues(alpha: 0.1),
                   foregroundColor: AppColors.error,
                 ),
               ),

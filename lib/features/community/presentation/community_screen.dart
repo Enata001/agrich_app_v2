@@ -14,7 +14,7 @@ import 'providers/community_provider.dart';
 
 
 class CommunityScreen extends ConsumerStatefulWidget {
-  const CommunityScreen({Key? key}) : super(key: key);
+  const CommunityScreen({super.key});
 
   @override
   ConsumerState<CommunityScreen> createState() => _CommunityScreenState();

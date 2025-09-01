@@ -43,7 +43,7 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
       state = state.copyWith(isLoading: false, isSuccess: true);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
-      throw e;
+      rethrow;
     }
   }
 

@@ -17,9 +17,9 @@ class PostDetailsScreen extends ConsumerStatefulWidget {
   final String postId;
 
   const PostDetailsScreen({
-    Key? key,
+    super.key,
     required this.postId,
-  }) : super(key: key);
+  });
 
   @override
   ConsumerState<PostDetailsScreen> createState() => _PostDetailsScreenState();
@@ -146,7 +146,7 @@ class _PostDetailsScreenState extends ConsumerState<PostDetailsScreen> {
               children: [
                 CircleAvatar(
                   radius: 25,
-                  backgroundColor: AppColors.primaryGreen.withOpacity(0.2),
+                  backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.2),
                   backgroundImage: authorAvatar.isNotEmpty
                       ? CachedNetworkImageProvider(authorAvatar)
                       : null,
@@ -414,7 +414,7 @@ class _PostDetailsScreenState extends ConsumerState<PostDetailsScreen> {
           children: [
           CircleAvatar(
           radius: 18,
-          backgroundColor: AppColors.primaryGreen.withOpacity(0.2),
+          backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.2),
           backgroundImage: authorAvatar.isNotEmpty
               ? CachedNetworkImageProvider(authorAvatar)
               : null,
