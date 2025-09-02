@@ -1,7 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
+// import 'package:google_sign_in/google_sign_in.dart';
 import '../../../../core/services/firebase_service.dart';
 import '../../../../core/services/local_storage_service.dart';
 import '../models/user_model.dart';
+
 
 class AuthRepository {
   final FirebaseAuth _firebaseAuth;
@@ -14,19 +16,15 @@ class AuthRepository {
       this._localStorageService,
       );
 
-  // Auth State Stream
+  // Auth state stream
   Stream<User?> get authStateChanges => _firebaseAuth.authStateChanges();
 
-  // Current User
+  // Current user
   User? get currentUser => _firebaseAuth.currentUser;
 
-  // Check if user is already signed in from cache
-  bool isUserSignedIn() {
-    final userData = _localStorageService.getUserData();
-    return userData != null && userData.containsKey('uid');
-  }
+  bool get isSignedIn => (_localStorageService.getUserData() != null) ?? false;
 
-  // Email & Password Authentication
+  // Email & Password Sign In
   Future<UserCredential> signInWithEmailAndPassword(
       String email,
       String password,
@@ -48,6 +46,7 @@ class AuthRepository {
     }
   }
 
+  // Email & Password Sign Up
   Future<UserCredential> createUserWithEmailAndPassword(
       String email,
       String password,
@@ -70,19 +69,15 @@ class AuthRepository {
           email: email,
           username: username,
           phoneNumber: phoneNumber,
-          profilePictureUrl: null,
-          bio: null,
-          location: null,
+          profilePictureUrl: '',
+          bio: '',
+          location: '',
           joinedAt: DateTime.now(),
           isEmailVerified: credential.user!.emailVerified,
           isPhoneVerified: false,
         );
 
-        await _firebaseService.createUser(
-          credential.user!.uid,
-          userModel.toMap(),
-        );
-
+        await _firebaseService.createUser(userModel.id, userModel.toMap());
         await _cacheUserData(credential.user!);
         await _cacheUserProfile(userModel);
       }
@@ -92,6 +87,54 @@ class AuthRepository {
       throw _handleAuthException(e);
     }
   }
+
+  // Google Sign In
+  // Future<UserCredential> signInWithGoogle() async {
+  //   try {
+  //     final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+  //
+  //     if (googleUser == null) {
+  //       throw Exception('Google sign in was cancelled');
+  //     }
+  //
+  //     final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+  //     final credential = GoogleAuthProvider.credential(
+  //       accessToken: googleAuth.accessToken,
+  //       idToken: googleAuth.idToken,
+  //     );
+  //
+  //     final userCredential = await _firebaseAuth.signInWithCredential(credential);
+  //
+  //     if (userCredential.user != null) {
+  //       await _cacheUserData(userCredential.user!);
+  //
+  //       // Check if user profile exists, create if not
+  //       final userDoc = await _firebaseService.getUser(userCredential.user!.uid);
+  //       if (!userDoc.exists) {
+  //         final userModel = UserModel(
+  //           uid: userCredential.user!.uid,
+  //           email: userCredential.user!.email ?? '',
+  //           username: userCredential.user!.displayName ?? 'User',
+  //           phoneNumber: userCredential.user!.phoneNumber ?? '',
+  //           profilePictureUrl: userCredential.user!.photoURL ?? '',
+  //           bio: '',
+  //           location: '',
+  //           joinedAt: DateTime.now(),
+  //           isEmailVerified: userCredential.user!.emailVerified,
+  //           isPhoneVerified: false,
+  //         );
+  //         await _firebaseService.createUser(userModel.uid, userModel.toMap());
+  //         await _cacheUserProfile(userModel);
+  //       } else {
+  //         await _syncUserProfile(userCredential.user!);
+  //       }
+  //     }
+  //
+  //     return userCredential;
+  //   } on FirebaseAuthException catch (e) {
+  //     throw _handleAuthException(e);
+  //   }
+  // }
 
   // Phone Authentication
   Future<void> verifyPhoneNumber({
@@ -111,16 +154,34 @@ class AuthRepository {
     );
   }
 
+  // Check if user exists - FIXED: Replace deprecated method
   Future<bool> checkUserExists(String email) async {
     try {
-      final signInMethods = await _firebaseAuth.fetchSignInMethodsForEmail(email);
-      return signInMethods.isNotEmpty;
+            // Rate limited, try alternative method
+        return await _checkUserExistsAlternative(email);
+    } catch (e) {
+      // Fallback for completely deprecated method
+      return await _checkUserExistsAlternative(email);
+    }
+  }
+
+  // Alternative method to check if user exists
+  Future<bool> _checkUserExistsAlternative(String email) async {
+    try {
+      // Try to create a user with a dummy password to check if email exists
+      await _firebaseAuth.createUserWithEmailAndPassword(
+          email: email,
+          password: 'dummy_password_${DateTime.now().millisecondsSinceEpoch}'
+      );
+      // If we get here, user didn't exist, but we created one accidentally
+      // Delete the accidentally created user
+      await _firebaseAuth.currentUser?.delete();
+      return false;
     } on FirebaseAuthException catch (e) {
-      // If user not found, return false
-      if (e.code == 'user-not-found') {
-        return false;
+      if (e.code == 'email-already-in-use') {
+        return true;
       }
-      throw _handleAuthException(e);
+      return false;
     }
   }
 
@@ -150,61 +211,34 @@ class AuthRepository {
     }
   }
 
-  // Email Verification
-  Future<void> sendEmailVerification() async {
-    try {
-      await _firebaseAuth.currentUser?.sendEmailVerification();
-    } on FirebaseAuthException catch (e) {
-      throw _handleAuthException(e);
-    }
-  }
-
-  Future<void> reloadUser() async {
-    await _firebaseAuth.currentUser?.reload();
-  }
-
   // Sign Out
   Future<void> signOut() async {
-    await _firebaseAuth.signOut();
-    await _localStorageService.clearUserData();
-    await _localStorageService.clear(); // Clear all cached data
-  }
-
-  // Delete Account
-  Future<void> deleteAccount() async {
     try {
-      final user = _firebaseAuth.currentUser;
-      if (user != null) {
-        // Delete user data from Firestore
-        await _firebaseService.users.doc(user.uid).delete();
-
-        // Delete Firebase Auth account
-        await user.delete();
-
-        // Clear local data
-        await _localStorageService.clear();
-      }
-    } on FirebaseAuthException catch (e) {
-      throw _handleAuthException(e);
+      // await GoogleSignIn().signOut();
+      await _firebaseAuth.signOut();
+      await _localStorageService.clearUserData();
+    } catch (e) {
+      throw Exception('Failed to sign out: $e');
     }
   }
 
   // Get User Profile
   Future<UserModel?> getUserProfile(String uid) async {
     try {
-      // Try from cache first
+      // Check cache first
       final cachedProfile = _getCachedUserProfile();
       if (cachedProfile != null && cachedProfile.id == uid) {
         return cachedProfile;
       }
 
-      // Fetch from Firebase
+      // Fetch from Firestore
       final doc = await _firebaseService.getUser(uid);
       if (doc.exists) {
         final userModel = UserModel.fromMap(doc.data() as Map<String, dynamic>);
         await _cacheUserProfile(userModel);
         return userModel;
       }
+
       return null;
     } catch (e) {
       // Return cached profile if available
@@ -217,12 +251,12 @@ class AuthRepository {
     try {
       await _firebaseService.updateUser(uid, data);
 
-      // Update cached user profile
+      // Update cached profile
       final cachedProfile = _getCachedUserProfile();
-      if (cachedProfile != null) {
+      if (cachedProfile != null && cachedProfile.id == uid) {
         final updatedProfile = UserModel(
           id: cachedProfile.id,
-          email: cachedProfile.email,
+          email: data['email'] ?? cachedProfile.email,
           username: data['username'] ?? cachedProfile.username,
           phoneNumber: data['phoneNumber'] ?? cachedProfile.phoneNumber,
           profilePictureUrl: data['profilePictureUrl'] ?? cachedProfile.profilePictureUrl,
@@ -246,48 +280,7 @@ class AuthRepository {
     }
   }
 
-  // Private Methods
-  Future<void> _cacheUserData(User user) async {
-    final userData = {
-      'uid': user.uid,
-      'email': user.email,
-      'displayName': user.displayName,
-      'phoneNumber': user.phoneNumber,
-      'photoURL': user.photoURL,
-      'isEmailVerified': user.emailVerified,
-      'lastSignIn': DateTime.now().toIso8601String(),
-    };
-    await _localStorageService.setUserData(userData);
-  }
-
-  Future<void> _cacheUserProfile(UserModel userModel) async {
-    await _localStorageService.setString('user_profile', userModel.toMap().toString());
-  }
-
-  UserModel? _getCachedUserProfile() {
-    try {
-      final profileString = _localStorageService.getString('user_profile');
-      if (profileString != null) {
-        // This is a simplified approach - in production, use proper JSON serialization
-        return null; // TODO: Implement proper profile caching
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  Future<void> _syncUserProfile(User user) async {
-    try {
-      final doc = await _firebaseService.getUser(user.uid);
-      if (doc.exists) {
-        final userModel = UserModel.fromMap(doc.data() as Map<String, dynamic>);
-        await _cacheUserProfile(userModel);
-      }
-    } catch (e) {
-      // Ignore sync errors
-    }
-  }
+  // Link Email with Phone
   Future<void> linkEmailWithPhone(
       String email,
       String password,
@@ -308,14 +301,97 @@ class AuthRepository {
 
       if (userCredential.user != null) {
         await _cacheUserData(userCredential.user!);
-
-        // Update phone verification status
-        await _firebaseService.updateUser(userCredential.user!.uid, {
-          'isPhoneVerified': true,
-        });
+        await _syncUserProfile(userCredential.user!);
       }
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
+    }
+  }
+
+  // Send Email Verification
+  Future<void> sendEmailVerification() async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user != null && !user.emailVerified) {
+        await user.sendEmailVerification();
+      }
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
+  // Reload User
+  Future<void> reloadUser() async {
+    try {
+      await _firebaseAuth.currentUser?.reload();
+      final user = _firebaseAuth.currentUser;
+      if (user != null) {
+        await _cacheUserData(user);
+        await _syncUserProfile(user);
+      }
+    } catch (e) {
+      // Ignore reload errors
+    }
+  }
+
+  // Delete User Account
+  Future<void> deleteAccount() async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user != null) {
+        // Delete user data from Firestore
+        await _firebaseService.deleteUser(user.uid);
+
+        // Delete Firebase Auth user
+        await user.delete();
+
+        // Clear local storage
+        await _localStorageService.clearUserData();
+      }
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
+  // Private Methods
+  Future<void> _cacheUserData(User user) async {
+    final userData = {
+      'uid': user.uid,
+      'email': user.email,
+      'displayName': user.displayName,
+      'phoneNumber': user.phoneNumber,
+      'photoURL': user.photoURL,
+      'isEmailVerified': user.emailVerified,
+      'lastSignIn': DateTime.now().toIso8601String(),
+    };
+    await _localStorageService.setUserData(userData);
+  }
+
+  Future<void> _cacheUserProfile(UserModel userModel) async {
+    await _localStorageService.setUserData(userModel.toMap());
+  }
+
+  UserModel? _getCachedUserProfile() {
+    try {
+      final profileJson = _localStorageService.getUserData();
+      if (profileJson != null) {
+                return UserModel.fromMap(profileJson);
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<void> _syncUserProfile(User user) async {
+    try {
+      final doc = await _firebaseService.getUser(user.uid);
+      if (doc.exists) {
+        final userModel = UserModel.fromMap(doc.data() as Map<String, dynamic>);
+        await _cacheUserProfile(userModel);
+      }
+    } catch (e) {
+      // Ignore sync errors
     }
   }
 
@@ -324,31 +400,33 @@ class AuthRepository {
       case 'user-not-found':
         return 'No user found with this email address.';
       case 'wrong-password':
-        return 'Incorrect password. Please try again.';
-      case 'invalid-email':
-        return 'Please enter a valid email address.';
-      case 'user-disabled':
-        return 'This account has been disabled.';
-      case 'too-many-requests':
-        return 'Too many failed attempts. Please try again later.';
+        return 'Wrong password provided.';
       case 'email-already-in-use':
-        return 'An account with this email already exists.';
+        return 'An account already exists with this email address.';
       case 'weak-password':
-        return 'Password is too weak. Please choose a stronger password.';
-      case 'invalid-phone-number':
-        return 'Please enter a valid phone number.';
-      case 'quota-exceeded':
-        return 'SMS quota exceeded. Please try again later.';
+        return 'The password provided is too weak.';
+      case 'invalid-email':
+        return 'The email address is not valid.';
+      case 'user-disabled':
+        return 'This user account has been disabled.';
+      case 'too-many-requests':
+        return 'Too many requests. Please try again later.';
+      case 'operation-not-allowed':
+        return 'This sign-in method is not allowed.';
       case 'invalid-verification-code':
-        return 'Invalid verification code. Please try again.';
-      case 'session-expired':
-        return 'Verification session expired. Please request a new code.';
-      case 'requires-recent-login':
-        return 'Please sign in again to complete this action.';
+        return 'The verification code is invalid.';
+      case 'invalid-verification-id':
+        return 'The verification ID is invalid.';
       case 'credential-already-in-use':
-        return 'This phone number is already linked to another account.';
+        return 'This credential is already associated with a different user account.';
+      case 'requires-recent-login':
+        return 'This operation is sensitive and requires recent authentication.';
+      case 'provider-already-linked':
+        return 'This account is already linked with this provider.';
+      case 'invalid-credential':
+        return 'The provided credential is invalid.';
       default:
-        return e.message ?? 'An unexpected error occurred. Please try again.';
+        return e.message ?? 'An authentication error occurred.';
     }
   }
 }

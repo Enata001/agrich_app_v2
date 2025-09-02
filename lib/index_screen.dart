@@ -77,7 +77,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       }
 
       // Check if user is signed in
-      final isSignedIn = authRepository.isUserSignedIn();
+      final isSignedIn = authRepository.isSignedIn;
       final currentUser = authRepository.currentUser;
 
       if (isSignedIn && currentUser != null) {

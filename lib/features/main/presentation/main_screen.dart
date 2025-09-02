@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../chat/presentation/chat_list_screen.dart';
 import '../../community/presentation/community_screen.dart';
+import '../../profile/presentation/profile_screen.dart';
 import '../../shared/widgets/custom_navigation_bar.dart';
 import '../../shared/widgets/gradient_background.dart';
 
@@ -11,7 +13,7 @@ import '../../shared/widgets/gradient_background.dart';
 final mainScreenIndexProvider = StateProvider<int>((ref) => 0);
 
 class MainScreen extends ConsumerStatefulWidget {
-  const MainScreen({Key? key}) : super(key: key);
+  const MainScreen({super.key});
 
   @override
   ConsumerState<MainScreen> createState() => _MainScreenState();

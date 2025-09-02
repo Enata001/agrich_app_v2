@@ -2,7 +2,8 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/providers/app_providers.dart';
-import '../../repositories/profile_repository.dart';
+import '../../data/repositories/profile_repository.dart';
+
 
 
 final profileProviderNotifier = StateNotifierProvider<ProfileNotifier, ProfileState>((ref) {

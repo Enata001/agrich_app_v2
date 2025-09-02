@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
-import '../../data/repositories/community_repository.dart';
 
 final createPostProvider = StateNotifierProvider<CreatePostNotifier, CreatePostState>((ref) {
   final communityRepository = ref.watch(communityRepositoryProvider);
@@ -9,7 +8,7 @@ final createPostProvider = StateNotifierProvider<CreatePostNotifier, CreatePostS
 });
 
 class CreatePostNotifier extends StateNotifier<CreatePostState> {
-  final CommunityRepository _communityRepository;
+  final dynamic _communityRepository;
 
   CreatePostNotifier(this._communityRepository) : super(CreatePostState.initial());
 
@@ -17,7 +16,7 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
     required String content,
     required String authorId,
     required String authorName,
-    required String authorEmail,
+    required String authorAvatar,
     File? imageFile,
   }) async {
     try {
@@ -25,16 +24,19 @@ class CreatePostNotifier extends StateNotifier<CreatePostState> {
 
       String? imageUrl;
       if (imageFile != null) {
-        imageUrl = await _communityRepository.uploadPostImage(imageFile);
+        // Upload image first
+        imageUrl = await _communityRepository.uploadPostImage(imageFile.path, authorId);
       }
 
       final postData = {
         'content': content,
         'authorId': authorId,
         'authorName': authorName,
-        'authorEmail': authorEmail,
-        'authorAvatar': '', // TODO: Get from user profile
+        'authorAvatar': authorAvatar,
         'imageUrl': imageUrl ?? '',
+        'likesCount': 0,
+        'commentsCount': 0,
+        'likedBy': <String>[],
         'createdAt': DateTime.now(),
         'updatedAt': DateTime.now(),
       };

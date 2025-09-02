@@ -6,21 +6,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import '../../features/community/data/repositories/community_repository.dart';
-import '../../features/profile/repositories/profile_repository.dart';
+import '../../features/profile/data/repositories/profile_repository.dart';
 import '../../features/tips/data/repositories/tips_repository.dart';
 import '../../features/videos/data/repositories/video_repository.dart';
 import '../../features/weather/data/repositories/weather_repository.dart';
+import '../../features/chat/data/repositories/chat_repository.dart';
 import '../router/app_router.dart';
 import '../services/local_storage_service.dart';
 import '../services/firebase_service.dart';
 import '../services/weather_service.dart';
 import '../../features/auth/data/repositories/auth_repository.dart';
-import '../../features/auth/providers/auth_provider.dart';
-
 
 // Initialize SharedPreferences
-final sharedPreferencesInitProvider = FutureProvider<SharedPreferences>((
-    ref) async {
+final sharedPreferencesInitProvider = FutureProvider<SharedPreferences>((ref) async {
   return await SharedPreferences.getInstance();
 });
 

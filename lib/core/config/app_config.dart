@@ -29,6 +29,9 @@ class AppConfig {
     'Machinery',
     'Planting',
     'Irrigation',
+    'Pest Control',
+    'Fertilization',
+    'Crop Rotation',
   ];
 
   // App Limits
