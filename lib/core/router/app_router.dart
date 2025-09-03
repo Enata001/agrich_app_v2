@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/auth/presentation/auth_screen.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
@@ -30,8 +29,9 @@ class AppRouter {
         path: AppRoutes.splash,
         name: 'splash',
         pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
           child: const SplashScreen(),
-          transitionsBuilder: RouteTransitions.fadeTransition,
+          transitionsBuilder: RouteTransitions.slidePullBackTransition,
         ),
       ),
 
@@ -40,9 +40,11 @@ class AppRouter {
         path: AppRoutes.onboarding,
         name: 'onboarding',
         pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
           child: const OnboardingScreen(),
           transitionsBuilder: RouteTransitions.slideTransition,
         ),
+
       ),
 
       // Auth Screen
@@ -50,8 +52,9 @@ class AppRouter {
         path: AppRoutes.auth,
         name: 'auth',
         pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
           child: const AuthScreen(),
-          transitionsBuilder: RouteTransitions.slideTransition,
+          transitionsBuilder: RouteTransitions.slidePullBackTransition,
         ),
       ),
 
@@ -60,8 +63,9 @@ class AppRouter {
         path: AppRoutes.forgotPassword,
         name: 'forgot-password',
         pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
           child: const ForgotPasswordScreen(),
-          transitionsBuilder: RouteTransitions.bounceTransition,
+          transitionsBuilder: RouteTransitions.slideTransition,
         ),
       ),
 
@@ -72,11 +76,12 @@ class AppRouter {
         pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
           return CustomTransitionPage(
+            key: state.pageKey,
             child: OtpVerificationScreen(
               phoneNumber: extra['phoneNumber'] as String? ?? '',
               verificationId: extra['verificationId'] as String? ?? '',
             ),
-            transitionsBuilder: RouteTransitions.curveTransition,
+            transitionsBuilder: RouteTransitions.slidePullBackTransition,
           );
         },
       ),
@@ -86,6 +91,7 @@ class AppRouter {
         path: AppRoutes.main,
         name: 'main',
         pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
           child: const MainScreen(),
           transitionsBuilder: RouteTransitions.slideTransition,
         ),
@@ -96,8 +102,9 @@ class AppRouter {
         path: AppRoutes.editProfile,
         name: 'edit-profile',
         pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
           child: const EditProfileScreen(),
-          transitionsBuilder: RouteTransitions.bounceTransition,
+          transitionsBuilder: RouteTransitions.slidePullBackTransition,
         ),
       ),
 
@@ -108,11 +115,12 @@ class AppRouter {
         pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
           return CustomTransitionPage(
+            key: state.pageKey,
             child: VideoPlayerScreen(
               videoUrl: extra['videoUrl'] as String? ?? '',
               videoTitle: extra['videoTitle'] as String? ?? '',
             ),
-            transitionsBuilder: RouteTransitions.fadeTransition,
+            transitionsBuilder: RouteTransitions.slidePullBackTransition,
           );
         },
       ),
@@ -124,6 +132,7 @@ class AppRouter {
         pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
           return CustomTransitionPage(
+            key: state.pageKey,
             child: VideosListScreen(
               category: extra['category'] as String? ?? '',
             ),
@@ -137,8 +146,9 @@ class AppRouter {
         path: AppRoutes.createPost,
         name: 'create-post',
         pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
           child: const CreatePostScreen(),
-          transitionsBuilder: RouteTransitions.bounceTransition,
+          transitionsBuilder: RouteTransitions.slidePullBackTransition,
         ),
       ),
 
@@ -149,9 +159,8 @@ class AppRouter {
         pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
           return CustomTransitionPage(
-            child: PostDetailsScreen(
-              postId: extra['postId'] as String? ?? '',
-            ),
+            key: state.pageKey,
+            child: PostDetailsScreen(postId: extra['postId'] as String? ?? ''),
             transitionsBuilder: RouteTransitions.slideTransition,
           );
         },
@@ -162,6 +171,7 @@ class AppRouter {
         path: AppRoutes.chatList,
         name: 'chat-list',
         pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
           child: const ChatListScreen(),
           transitionsBuilder: RouteTransitions.slideTransition,
         ),
@@ -174,6 +184,7 @@ class AppRouter {
         pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
           return CustomTransitionPage(
+            key: state.pageKey,
             child: ChatScreen(
               chatId: extra['chatId'] as String? ?? '',
               recipientName: extra['recipientName'] as String? ?? '',

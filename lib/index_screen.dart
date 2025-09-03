@@ -122,25 +122,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                 builder: (context, child) {
                   return Transform.scale(
                     scale: _logoAnimation.value,
-                    child: Container(
+                    child: SizedBox(
                       width: 120,
                       height: 120,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.eco,
-                        size: 60,
-                        color: AppColors.primaryGreen,
-                      ),
+                      child:Image.asset('assets/images/tree.png'),
                     ),
                   );
                 },

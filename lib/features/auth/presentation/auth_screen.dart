@@ -73,7 +73,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   Widget build(BuildContext context) {
     return CustomScaffold(
       showGradient: true,
-      animateGradient: true,
+      animateGradient: false,
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnimation,
@@ -83,6 +83,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
               _buildTabBar(),
               Expanded(
                 child: TabBarView(
+
                   controller: _tabController,
                   children: [
                     _buildSignInTab(),
@@ -104,30 +105,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
         padding: const EdgeInsets.all(32),
         child: Column(
           children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.eco,
-                size: 40,
-                color: AppColors.primaryGreen,
-              ),
-            ),
-            const SizedBox(height: 24),
+                        const SizedBox(height: 48),
             Text(
-              'Agrich 2.0',
-              style: Theme.of(context).textTheme.displaySmall?.copyWith(
+              'Agrich',
+              style: Theme.of(context).textTheme.displayLarge?.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
               ),
@@ -151,7 +132,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
       duration: const Duration(milliseconds: 800),
       delay: const Duration(milliseconds: 200),
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 32),
+        margin: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(16),
@@ -174,6 +155,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
             fontWeight: FontWeight.w400,
             fontSize: 16,
           ),
+          padding: EdgeInsets.zero,
           tabs: const [
             Tab(text: 'Sign In'),
             Tab(text: 'Sign Up'),
@@ -188,7 +170,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
       duration: const Duration(milliseconds: 800),
       delay: const Duration(milliseconds: 400),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(16),
         child: Form(
           key: _signInFormKey,
           child: Column(
@@ -239,8 +221,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
               CustomButton(
                 text: 'Sign In with Phone',
                 variant: ButtonVariant.outlined,
-                icon: const Icon(Icons.phone, color: Colors.white),
-                textColor: Colors.white,
+                icon: const Icon(Icons.phone,),
+                // textColor: Colors.white,
                 onPressed: _handlePhoneSignIn,
                 width: double.infinity,
               ),
@@ -256,7 +238,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
       duration: const Duration(milliseconds: 800),
       delay: const Duration(milliseconds: 400),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(16),
         child: Form(
           key: _signUpFormKey,
           child: Column(
@@ -316,7 +298,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
               Text(
                 'By creating an account, you agree to our Terms of Service and Privacy Policy',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.7),
+                  // color: Colors.white.withValues(alpha: 0.7),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -332,7 +314,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
       children: [
         Expanded(
           child: Divider(
-            color: Colors.white.withValues(alpha: 0.3),
+            // color: Colors.white.withValues(alpha: 0.3),
             thickness: 1,
           ),
         ),
@@ -341,14 +323,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
           child: Text(
             'OR',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
+              color: Theme.of(context).dividerColor,
               fontWeight: FontWeight.w500,
             ),
           ),
         ),
         Expanded(
           child: Divider(
-            color: Colors.white.withValues(alpha: 0.3),
             thickness: 1,
           ),
         ),
