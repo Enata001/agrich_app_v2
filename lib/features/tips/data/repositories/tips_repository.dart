@@ -19,7 +19,7 @@ class TipsRepository {
       }
 
       // Fetch from Firebase
-      final tipDoc = await _firebaseService.getTodaysTip();
+      final tipDoc = await _firebaseService.getDailyTip();
       if (tipDoc.exists) {
         final tipData = tipDoc.data() as Map<String, dynamic>;
         final tip = {
@@ -63,7 +63,7 @@ class TipsRepository {
 
   Future<List<Map<String, dynamic>>> getTipsHistory() async {
     try {
-      final snapshot = await _firebaseService.getAllTips();
+      final snapshot = await _firebaseService.getTips();
       final tips = <Map<String, dynamic>>[];
 
       for (final doc in snapshot.docs) {
@@ -88,10 +88,8 @@ class TipsRepository {
 
   Future<List<Map<String, dynamic>>> getTipsByCategory(String category) async {
     try {
-      final snapshot = await _firebaseService.tips
-          .where('category', isEqualTo: category)
-          .orderBy('date', descending: true)
-          .get();
+      final snapshot = await _firebaseService.getTipsByCategory(category);
+
 
       final tips = <Map<String, dynamic>>[];
 

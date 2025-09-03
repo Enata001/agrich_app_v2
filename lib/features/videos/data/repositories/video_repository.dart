@@ -95,7 +95,7 @@ class VideosRepository {
 
   Future<Map<String, dynamic>?> getVideoDetails(String videoId) async {
     try {
-      final doc = await _firebaseService.videos.doc(videoId).get();
+      final doc = await _firebaseService.getVideo(videoId);
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
         return {

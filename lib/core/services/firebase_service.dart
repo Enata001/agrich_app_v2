@@ -410,13 +410,14 @@ class FirebaseService {
     return await uploadImage(imagePath, fileName, AppConfig.postImagesPath);
   }
 
-  Future<String> uploadProfilePicture(String imagePath, String userId) async {
+  Future<String> uploadProfilePicture(File imageFile, String userId) async {
     final fileName = '${userId}_profile.jpg';
-    return await uploadImage(
-      imagePath,
-      fileName,
-      AppConfig.profilePicturesPath,
-    );
+    final ref = _storage.ref().child('${AppConfig.profilePicturesPath}/$fileName');
+
+    final uploadTask = ref.putFile(imageFile);
+    final snapshot = await uploadTask.whenComplete(() {});
+
+    return await snapshot.ref.getDownloadURL();
   }
 
   Future<String> uploadChatImage(String imagePath, String chatId) async {
