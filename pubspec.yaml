@@ -44,6 +44,8 @@ dependencies:
   weather: ^3.1.1
   timeago: ^3.7.1
   flutter_launcher_icons: ^0.14.4
+  share_plus: ^11.1.0
+  mask_text_input_formatter: ^2.9.0
 
 dev_dependencies:
   flutter_test:

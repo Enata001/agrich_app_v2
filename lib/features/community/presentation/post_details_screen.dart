@@ -4,6 +4,7 @@ import 'package:animate_do/animate_do.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_colors.dart';
@@ -12,6 +13,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../../shared/widgets/loading_indicator.dart';
 import '../../shared/widgets/custom_button.dart';
 import 'providers/community_provider.dart';
+
 
 class PostDetailsScreen extends ConsumerStatefulWidget {
   final String postId;
@@ -28,13 +30,38 @@ class PostDetailsScreen extends ConsumerStatefulWidget {
 class _PostDetailsScreenState extends ConsumerState<PostDetailsScreen> {
   final TextEditingController _commentController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _commentFocusNode = FocusNode();
+
   bool _isAddingComment = false;
+  bool _isPostSaved = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkIfPostSaved();
+  }
 
   @override
   void dispose() {
     _commentController.dispose();
     _scrollController.dispose();
+    _commentFocusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkIfPostSaved() async {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser != null) {
+      try {
+        final communityRepository = ref.read(communityRepositoryProvider);
+        final saved = await communityRepository.isPostSaved(widget.postId, currentUser.uid);
+        setState(() {
+          _isPostSaved = saved;
+        });
+      } catch (e) {
+        // Ignore error
+      }
+    }
   }
 
   @override
@@ -55,30 +82,30 @@ class _PostDetailsScreenState extends ConsumerState<PostDetailsScreen> {
         ),
         actions: [
           IconButton(
-            onPressed: () => _sharePost(context),
+            onPressed: () => _sharePost(),
             icon: const Icon(Icons.share, color: Colors.white),
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
-            onSelected: (value) => _handleMenuAction(context, value),
+            onSelected: (value) => _handleMenuAction(value),
             itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'report',
+              PopupMenuItem(
+                value: 'save',
                 child: Row(
                   children: [
-                    Icon(Icons.report, size: 20),
-                    SizedBox(width: 8),
-                    Text('Report Post'),
+                    Icon(_isPostSaved ? Icons.bookmark : Icons.bookmark_border, size: 20),
+                    const SizedBox(width: 8),
+                    Text(_isPostSaved ? 'Unsave Post' : 'Save Post'),
                   ],
                 ),
               ),
               const PopupMenuItem(
-                value: 'save',
+                value: 'report',
                 child: Row(
                   children: [
-                    Icon(Icons.bookmark, size: 20),
+                    Icon(Icons.report, size: 20, color: Colors.red),
                     SizedBox(width: 8),
-                    Text('Save Post'),
+                    Text('Report Post', style: TextStyle(color: Colors.red)),
                   ],
                 ),
               ),
@@ -88,160 +115,213 @@ class _PostDetailsScreenState extends ConsumerState<PostDetailsScreen> {
       ),
       body: postDetails.when(
         data: (post) => post != null
-            ? _buildPostDetailsContent(context, post, postComments)
-            : _buildNotFoundState(context),
-        loading: () => const Center(
-          child: LoadingIndicator(
-            size: LoadingSize.medium,
-            color: AppColors.primaryGreen,
-            message: 'Loading post...',
-          ),
-        ),
-        error: (error, stack) => _buildErrorState(context),
+            ? _buildPostContent(post, postComments)
+            : _buildNotFoundState(),
+        loading: () => _buildLoadingState(),
+        error: (error, stack) => _buildErrorState(error),
       ),
+      bottomNavigationBar: _buildCommentInput(),
     );
   }
 
-  Widget _buildPostDetailsContent(
-      BuildContext context,
+  Widget _buildPostContent(
       Map<String, dynamic> post,
       AsyncValue<List<Map<String, dynamic>>> commentsAsync,
       ) {
     return Column(
       children: [
         Expanded(
-          child: SingleChildScrollView(
+          child: CustomScrollView(
             controller: _scrollController,
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                // Post Content
-                FadeInUp(
-                  duration: const Duration(milliseconds: 600),
-                  child: _buildPostCard(context, post),
-                ),
+            slivers: [
+              // Post content
+              SliverToBoxAdapter(
+                child: _buildPostHeader(post),
+              ),
 
-                const SizedBox(height: 30),
-
-                // Comments Section
-                FadeInUp(
-                  duration: const Duration(milliseconds: 600),
-                  delay: const Duration(milliseconds: 200),
-                  child: _buildCommentsSection(context, commentsAsync),
+              // Comments section
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 20),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Text(
+                          'Comments',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              ),
+
+              // Comments list
+              commentsAsync.when(
+                data: (comments) => comments.isNotEmpty
+                    ? SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                        (context, index) => FadeInUp(
+                      duration: const Duration(milliseconds: 400),
+                      delay: Duration(milliseconds: index * 100),
+                      child: _buildCommentItem(comments[index]),
+                    ),
+                    childCount: comments.length,
+                  ),
+                )
+                    : SliverToBoxAdapter(
+                  child: _buildNoCommentsState(),
+                ),
+                loading: () => SliverToBoxAdapter(
+                  child: _buildCommentsLoadingState(),
+                ),
+                error: (error, stack) => SliverToBoxAdapter(
+                  child: _buildCommentsErrorState(),
+                ),
+              ),
+
+              // Bottom spacing for comment input
+              const SliverToBoxAdapter(
+                child: SizedBox(height: 100),
+              ),
+            ],
           ),
         ),
-
-        // Comment Input
-        _buildCommentInput(context),
       ],
     );
   }
 
-  Widget _buildPostCard(BuildContext context, Map<String, dynamic> post) {
-    final content = post['content'] as String? ?? '';
-    final authorName = post['authorName'] as String? ?? 'Unknown User';
-    final authorAvatar = post['authorAvatar'] as String? ?? '';
-    final imageUrl = post['imageUrl'] as String? ?? '';
-    final likesCount = post['likesCount'] as int? ?? 0;
-    final commentsCount = post['commentsCount'] as int? ?? 0;
-    final createdAt = post['createdAt'] as DateTime?;
-    final currentUser = ref.watch(currentUserProvider);
-    final isLiked = post['likedBy']?.contains(currentUser?.uid) ?? false;
-
-    return Container(
-      decoration: BoxDecoration(
+  Widget _buildPostHeader(Map<String, dynamic> post) {
+    return FadeInDown(
+      duration: const Duration(milliseconds: 600),
+      child: Container(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Author info
+            Row(
               children: [
                 CircleAvatar(
-                  radius: 25,
+                  radius: 24,
                   backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.2),
-                  backgroundImage: authorAvatar.isNotEmpty
-                      ? CachedNetworkImageProvider(authorAvatar)
+                  backgroundImage: post['authorAvatar']?.isNotEmpty == true
+                      ? CachedNetworkImageProvider(post['authorAvatar'])
                       : null,
-                  child: authorAvatar.isEmpty
+                  child: post['authorAvatar']?.isEmpty != false
                       ? Text(
-                    authorName.isNotEmpty ? authorName[0].toUpperCase() : 'U',
+                    post['authorName']?.isNotEmpty == true
+                        ? post['authorName'][0].toUpperCase()
+                        : 'U',
                     style: const TextStyle(
                       color: AppColors.primaryGreen,
                       fontWeight: FontWeight.bold,
-                      fontSize: 18,
                     ),
                   )
                       : null,
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        authorName,
+                        post['authorName'] ?? 'Unknown User',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      if (createdAt != null)
-                        Text(
-                          timeago.format(createdAt),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey.shade600,
-                          ),
+                      Text(
+                        timeago.format(post['createdAt'] ?? DateTime.now()),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.grey.shade600,
                         ),
+                      ),
                     ],
                   ),
                 ),
-                Icon(
-                  Icons.public,
-                  size: 16,
-                  color: Colors.grey.shade600,
-                ),
               ],
             ),
-          ),
 
-          // Content
-          if (content.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                content,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  height: 1.5,
-                  color: AppColors.textPrimary,
-                ),
+            const SizedBox(height: 16),
+
+            // Post content
+            Text(
+              post['content'] ?? '',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                height: 1.5,
               ),
             ),
 
-          // Image
-          if (imageUrl.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            ClipRRect(
-              borderRadius: const BorderRadius.all(Radius.circular(12)),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+            // Location
+            if (post['location'] != null && post['location'].isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(
+                    Icons.location_on,
+                    color: AppColors.primaryGreen,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    post['location'],
+                    style: TextStyle(
+                      color: AppColors.primaryGreen,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
+            // Tags
+            if (post['tags'] != null && (post['tags'] as List).isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: (post['tags'] as List).map<Widget>((tag) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryGreen.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '#$tag',
+                      style: const TextStyle(
+                        color: AppColors.primaryGreen,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+
+            // Post image
+            if (post['imageUrl'] != null && post['imageUrl'].isNotEmpty) ...[
+              const SizedBox(height: 16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
                 child: CachedNetworkImage(
-                  imageUrl: imageUrl,
+                  imageUrl: post['imageUrl'],
                   width: double.infinity,
+                  height: 300,
                   fit: BoxFit.cover,
                   placeholder: (context, url) => Container(
                     height: 300,
@@ -257,152 +337,88 @@ class _PostDetailsScreenState extends ConsumerState<PostDetailsScreen> {
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
 
-          const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
-          // Actions
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+            // Interaction buttons
+            Row(
               children: [
-                _buildActionButton(
-                  icon: isLiked ? Icons.favorite : Icons.favorite_border,
-                  label: '$likesCount',
-                  color: isLiked ? Colors.red : Colors.grey.shade600,
-                  onTap: () => _toggleLike(post['id']),
+                _buildInteractionButton(
+                  icon: Icons.favorite,
+                  label: _formatCount(post['likesCount'] ?? 0),
+                  color: AppColors.error,
+                  onTap: () => _likePost(),
                 ),
-                _buildActionButton(
-                  icon: Icons.comment_outlined,
-                  label: '$commentsCount',
-                  color: Colors.grey.shade600,
+                _buildInteractionButton(
+                  icon: Icons.comment,
+                  label: _formatCount(post['commentsCount'] ?? 0),
+                  color: AppColors.info,
                   onTap: () => _focusCommentInput(),
                 ),
-                _buildActionButton(
-                  icon: Icons.share_outlined,
+                _buildInteractionButton(
+                  icon: Icons.share,
                   label: 'Share',
-                  color: Colors.grey.shade600,
-                  onTap: () => _sharePost(context),
+                  color: AppColors.primaryGreen,
+                  onTap: () => _sharePost(),
                 ),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildActionButton({
+  Widget _buildInteractionButton({
     required IconData icon,
     required String label,
     required Color color,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCommentsSection(BuildContext context, AsyncValue<List<Map<String, dynamic>>> commentsAsync) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Text(
-              'Comments',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-          commentsAsync.when(
-            data: (comments) => comments.isNotEmpty
-                ? Column(
-              children: comments.map((comment) => _buildCommentItem(context, comment)).toList(),
-            )
-                : _buildNoCommentsState(context),
-            loading: () => const Padding(
-              padding: EdgeInsets.all(20),
-              child: Center(
-                child: LoadingIndicator(
-                  size: LoadingSize.small,
-                  color: AppColors.primaryGreen,
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
                 ),
               ),
-            ),
-            error: (error, stack) => Padding(
-              padding: const EdgeInsets.all(20),
-              child: Text(
-                'Failed to load comments',
-                style: TextStyle(color: Colors.red.shade600),
-                textAlign: TextAlign.center,
-              ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildCommentItem(BuildContext context, Map<String, dynamic> comment) {
-    final content = comment['content'] as String? ?? '';
-    final authorName = comment['authorName'] as String? ?? 'Unknown User';
-    final authorAvatar = comment['authorAvatar'] as String? ?? '';
-    final createdAt = comment['createdAt'] as DateTime?;
-
+  Widget _buildCommentItem(Map<String, dynamic> comment) {
     return Container(
+      color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: Colors.grey.shade200, width: 0.5),
-        ),
-      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
-            radius: 20,
+            radius: 18,
             backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.2),
-            backgroundImage: authorAvatar.isNotEmpty
-                ? CachedNetworkImageProvider(authorAvatar)
+            backgroundImage: comment['authorAvatar']?.isNotEmpty == true
+                ? CachedNetworkImageProvider(comment['authorAvatar'])
                 : null,
-            child: authorAvatar.isEmpty
+            child: comment['authorAvatar']?.isEmpty != false
                 ? Text(
-              authorName.isNotEmpty ? authorName[0].toUpperCase() : 'U',
+              comment['authorName']?.isNotEmpty == true
+                  ? comment['authorName'][0].toUpperCase()
+                  : 'U',
               style: const TextStyle(
                 color: AppColors.primaryGreen,
                 fontWeight: FontWeight.bold,
@@ -419,27 +435,27 @@ class _PostDetailsScreenState extends ConsumerState<PostDetailsScreen> {
                 Row(
                   children: [
                     Text(
-                      authorName,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      comment['authorName'] ?? 'Unknown User',
+                      style: const TextStyle(
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        fontSize: 14,
                       ),
                     ),
                     const SizedBox(width: 8),
-                    if (createdAt != null)
-                      Text(
-                        timeago.format(createdAt),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.grey.shade600,
-                        ),
+                    Text(
+                      timeago.format(comment['createdAt'] ?? DateTime.now()),
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 12,
                       ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  content,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
+                  comment['content'] ?? '',
+                  style: const TextStyle(
+                    fontSize: 14,
                     height: 1.4,
                   ),
                 ),
@@ -448,22 +464,32 @@ class _PostDetailsScreenState extends ConsumerState<PostDetailsScreen> {
                   children: [
                     GestureDetector(
                       onTap: () => _likeComment(comment['id']),
-                      child: Text(
-                        'Like',
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.favorite_border,
+                            color: Colors.grey.shade600,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatCount(comment['likesCount'] ?? 0),
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 16),
                     GestureDetector(
-                      onTap: () => _replyToComment(context, comment),
+                      onTap: () => _replyToComment(comment),
                       child: Text(
                         'Reply',
                         style: TextStyle(
-                          color: Colors.grey.shade600,
+                          color: AppColors.primaryGreen,
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
                         ),
@@ -479,9 +505,217 @@ class _PostDetailsScreenState extends ConsumerState<PostDetailsScreen> {
     );
   }
 
-  // FIXED: Add missing _buildNoCommentsState method
-  Widget _buildNoCommentsState(BuildContext context) {
-    return Padding(
+  Widget _buildCommentInput() {
+    final currentUser = ref.watch(currentUserProvider);
+
+    return Container(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        top: 20,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.2),
+            backgroundImage: currentUser?.photoURL != null
+                ? NetworkImage(currentUser!.photoURL!)
+                : null,
+            child: currentUser?.photoURL == null
+                ? Text(
+              currentUser?.displayName?.isNotEmpty == true
+                  ? currentUser!.displayName![0].toUpperCase()
+                  : 'U',
+              style: const TextStyle(
+                color: AppColors.primaryGreen,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            )
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: TextField(
+              controller: _commentController,
+              focusNode: _commentFocusNode,
+              decoration: InputDecoration(
+                hintText: 'Add a comment...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+              ),
+              maxLines: null,
+              maxLength: AppConfig.maxCommentLength,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _addComment(),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: _isAddingComment ? null : _addComment,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _commentController.text.trim().isNotEmpty
+                    ? AppColors.primaryGreen
+                    : Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: _isAddingComment
+                  ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+                  : Icon(
+                Icons.send,
+                color: _commentController.text.trim().isNotEmpty
+                    ? Colors.white
+                    : Colors.grey.shade600,
+                size: 18,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return const Center(
+      child: LoadingIndicator(
+        size: LoadingSize.large,
+        message: 'Loading post...',
+      ),
+    );
+  }
+
+  Widget _buildNotFoundState() {
+    return Center(
+      child: FadeIn(
+        duration: const Duration(milliseconds: 800),
+        child: Container(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.search_off,
+                size: 80,
+                color: Colors.grey.shade400,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Post not found',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'The post you\'re looking for doesn\'t exist or has been removed.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 32),
+              CustomButton(
+                text: 'Go Back',
+                onPressed: () => context.pop(),
+                backgroundColor: AppColors.primaryGreen,
+                textColor: Colors.white,
+                icon: const Icon(Icons.arrow_back),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(Object error) {
+    return Center(
+      child: FadeIn(
+        duration: const Duration(milliseconds: 800),
+        child: Container(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 80,
+                color: Colors.red.shade400,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Unable to load post',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Please check your connection and try again.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 32),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CustomButton(
+                    text: 'Retry',
+                    onPressed: () {
+                      ref.invalidate(postDetailsProvider(widget.postId));
+                      ref.invalidate(postCommentsProvider(widget.postId));
+                    },
+                    backgroundColor: AppColors.primaryGreen,
+                    textColor: Colors.white,
+                    icon: const Icon(Icons.refresh),
+                  ),
+                  const SizedBox(width: 16),
+                  CustomButton(
+                    text: 'Go Back',
+                    onPressed: () => context.pop(),
+                    backgroundColor: Colors.grey.shade200,
+                    textColor: AppColors.textPrimary,
+                    icon: const Icon(Icons.arrow_back),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoCommentsState() {
+    return Container(
+      color: Colors.white,
       padding: const EdgeInsets.all(40),
       child: Column(
         children: [
@@ -511,260 +745,102 @@ class _PostDetailsScreenState extends ConsumerState<PostDetailsScreen> {
     );
   }
 
-  // FIXED: Add missing _buildNotFoundState method
-  Widget _buildNotFoundState(BuildContext context) {
-    return Center(
-      child: FadeIn(
-        duration: const Duration(milliseconds: 800),
-        child: Container(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.search_off,
-                size: 80,
-                color: Colors.grey.shade400,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Post not found',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'The post you\'re looking for doesn\'t exist or has been removed.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey.shade600,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              CustomButton(
-                text: 'Go Back',
-                onPressed: () => context.pop(),
-                backgroundColor: AppColors.primaryGreen,
-                textColor: Colors.white,
-                icon: Icon(Icons.arrow_back),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // FIXED: Add missing _buildErrorState method
-  Widget _buildErrorState(BuildContext context) {
-    return Center(
-      child: FadeIn(
-        duration: const Duration(milliseconds: 800),
-        child: Container(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 80,
-                color: Colors.red.shade400,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Unable to load post',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Please check your connection and try again.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey.shade600,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CustomButton(
-                    text: 'Retry',
-                    onPressed: () {
-                      ref.invalidate(postDetailsProvider(widget.postId));
-                      ref.invalidate(postCommentsProvider(widget.postId));
-                    },
-                    backgroundColor: AppColors.primaryGreen,
-                    textColor: Colors.white,
-                    icon: Icon(Icons.refresh),
-                  ),
-                  const SizedBox(width: 16),
-                  CustomButton(
-                    text: 'Go Back',
-                    onPressed: () => context.pop(),
-                    backgroundColor: Colors.grey.shade200,
-                    textColor: AppColors.textPrimary,
-                    icon: Icon(Icons.arrow_back),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // FIXED: Add missing _buildCommentInput method
-  Widget _buildCommentInput(BuildContext context) {
-    final currentUser = ref.watch(currentUserProvider);
-
+  Widget _buildCommentsLoadingState() {
     return Container(
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-        top: 20,
+      color: Colors.white,
+      padding: const EdgeInsets.all(40),
+      child: const Center(
+        child: LoadingIndicator(
+          size: LoadingSize.medium,
+          message: 'Loading comments...',
+        ),
       ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
+    );
+  }
+
+  Widget _buildCommentsErrorState() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(40),
+      child: Column(
         children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.2),
-            backgroundImage: currentUser?.photoURL != null
-                ? NetworkImage(currentUser!.photoURL!)
-                : null,
-            child: currentUser?.photoURL == null
-                ? Text(
-              currentUser?.displayName?.isNotEmpty == true
-                  ? currentUser!.displayName![0].toUpperCase()
-                  : 'U',
-              style: const TextStyle(
-                color: AppColors.primaryGreen,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-            )
-                : null,
+          Icon(
+            Icons.error_outline,
+            size: 60,
+            color: Colors.red.shade400,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(25),
-              ),
-              child: TextField(
-                controller: _commentController,
-                decoration: const InputDecoration(
-                  hintText: 'Write a comment...',
-                  border: InputBorder.none,
-                  isDense: true,
-                ),
-                textCapitalization: TextCapitalization.sentences,
-                maxLines: 3,
-                minLines: 1,
-                onSubmitted: (_) => _submitComment(),
-              ),
+          const SizedBox(height: 16),
+          Text(
+            'Unable to load comments',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: Colors.red.shade600,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(width: 8),
-          IconButton(
-            onPressed: _isAddingComment ? null : _submitComment,
-            icon: _isAddingComment
-                ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryGreen),
-              ),
-            )
-                : const Icon(
-              Icons.send,
-              color: AppColors.primaryGreen,
-            ),
+          const SizedBox(height: 16),
+          CustomButton(
+            text: 'Retry',
+            onPressed: () {
+              ref.invalidate(postCommentsProvider(widget.postId));
+            },
+            backgroundColor: AppColors.primaryGreen,
+            textColor: Colors.white,
           ),
         ],
       ),
     );
   }
 
-  void _toggleLike(String postId) {
-    final currentUser = ref.read(currentUserProvider);
-    if (currentUser != null) {
-      ref.read(communityRepositoryProvider).likePost(postId);
-      ref.invalidate(postDetailsProvider(widget.postId));
+  String _formatCount(int count) {
+    if (count >= 1000000) {
+      return '${(count / 1000000).toStringAsFixed(1)}M';
+    } else if (count >= 1000) {
+      return '${(count / 1000).toStringAsFixed(1)}K';
+    } else {
+      return count.toString();
     }
   }
 
   void _focusCommentInput() {
-    // Focus on comment input and scroll to bottom
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
+    _commentFocusNode.requestFocus();
   }
 
-  Future<void> _submitComment() async {
-    final content = _commentController.text.trim();
-    if (content.isEmpty || _isAddingComment) return;
-
+  Future<void> _likePost() async {
     final currentUser = ref.read(currentUserProvider);
-    if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please sign in to comment'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+    if (currentUser == null) return;
 
-    if (content.length > AppConfig.maxCommentLength) {
+    try {
+      final communityRepository = ref.read(communityRepositoryProvider);
+      await communityRepository.likePost(widget.postId, currentUser.uid);
+
+      // Refresh post details to show updated like count
+      ref.invalidate(postDetailsProvider(widget.postId));
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Comment is too long (max ${AppConfig.maxCommentLength} characters)'),
+          content: Text('Failed to like post: $e'),
           backgroundColor: Colors.red,
         ),
       );
-      return;
     }
+  }
+
+  Future<void> _addComment() async {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null || _commentController.text.trim().isEmpty) return;
 
     setState(() {
       _isAddingComment = true;
     });
 
     try {
-      await ref.read(communityRepositoryProvider).addComment(
-        widget.postId,
-        {
-          'content': content,
-          'authorId': currentUser.uid,
-          'authorName': currentUser.displayName ?? 'User',
-          'authorAvatar': currentUser.photoURL ?? '',
-          'createdAt': DateTime.now(),
-        },
+      final communityRepository = ref.read(communityRepositoryProvider);
+      await communityRepository.createComment(
+        postId: widget.postId,
+        content: _commentController.text.trim(),
+        authorId: currentUser.uid,
+        authorName: currentUser.displayName ?? 'User',
+        authorAvatar: currentUser.photoURL ?? '',
       );
 
       _commentController.clear();
@@ -782,102 +858,181 @@ class _PostDetailsScreenState extends ConsumerState<PostDetailsScreen> {
         }
       });
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to add comment: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to add comment: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isAddingComment = false;
-        });
-      }
+      setState(() {
+        _isAddingComment = false;
+      });
     }
   }
 
-  void _likeComment(String commentId) {
-    // TODO: Implement comment like functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Comment like feature coming soon!'),
-        backgroundColor: AppColors.info,
-      ),
-    );
+  Future<void> _likeComment(String commentId) async {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) return;
+
+    try {
+      final communityRepository = ref.read(communityRepositoryProvider);
+      await communityRepository.likeComment(commentId, currentUser.uid);
+
+      ref.invalidate(postCommentsProvider(widget.postId));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to like comment: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
-  void _replyToComment(BuildContext context, Map<String, dynamic> comment) {
+  void _replyToComment(Map<String, dynamic> comment) {
     final authorName = comment['authorName'] as String? ?? 'User';
     _commentController.text = '@$authorName ';
     _commentController.selection = TextSelection.fromPosition(
       TextPosition(offset: _commentController.text.length),
     );
-
-    // Focus on input
     _focusCommentInput();
   }
 
-  void _sharePost(BuildContext context) {
-    // TODO: Implement share functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Share functionality coming soon!'),
-        backgroundColor: AppColors.info,
-      ),
-    );
+  Future<void> _sharePost() async {
+    try {
+      final communityRepository = ref.read(communityRepositoryProvider);
+      final shareText = await communityRepository.sharePost(widget.postId);
+
+      await SharePlus.instance.share(ShareParams(text: shareText));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to share post: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
-  void _handleMenuAction(BuildContext context, String action) {
+  void _handleMenuAction(String action) {
     switch (action) {
-      case 'report':
-        _reportPost(context);
-        break;
       case 'save':
-        _savePost(context);
+        _toggleSavePost();
+        break;
+      case 'report':
+        _showReportDialog();
         break;
     }
   }
 
-  void _reportPost(BuildContext context) {
+  Future<void> _toggleSavePost() async {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) return;
+
+    try {
+      final communityRepository = ref.read(communityRepositoryProvider);
+
+      if (_isPostSaved) {
+        await communityRepository.unsavePost(widget.postId, currentUser.uid);
+        setState(() {
+          _isPostSaved = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Post removed from saved posts'),
+            backgroundColor: AppColors.info,
+          ),
+        );
+      } else {
+        await communityRepository.savePost(widget.postId, currentUser.uid);
+        setState(() {
+          _isPostSaved = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Post saved successfully!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to ${_isPostSaved ? 'unsave' : 'save'} post: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _showReportDialog() {
+    final reasons = [
+      'Spam or misleading content',
+      'Inappropriate language',
+      'Harassment or bullying',
+      'False information',
+      'Copyright violation',
+      'Other',
+    ];
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Report Post'),
-        content: const Text('Are you sure you want to report this post? Our team will review it.'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Why are you reporting this post?'),
+            const SizedBox(height: 16),
+            ...reasons.map(
+                  (reason) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(reason),
+                onTap: () {
+                  Navigator.pop(context);
+                  _reportPost(reason);
+                },
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: Implement report functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Post reported. Thank you for your feedback.'),
-                  backgroundColor: AppColors.success,
-                ),
-              );
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Report'),
           ),
         ],
       ),
     );
   }
 
-  void _savePost(BuildContext context) {
-    // TODO: Implement save post functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Post saved to your bookmarks!'),
-        backgroundColor: AppColors.success,
-      ),
-    );
+  Future<void> _reportPost(String reason) async {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) return;
+
+    try {
+      final communityRepository = ref.read(communityRepositoryProvider);
+      await communityRepository.reportPost(
+        postId: widget.postId,
+        reporterId: currentUser.uid,
+        reason: reason,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Post reported. Thank you for your feedback.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to report post: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }

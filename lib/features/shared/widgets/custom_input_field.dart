@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:intl_phone_field/phone_number.dart';
+import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 
 import '../../../core/theme/app_colors.dart';
 
@@ -185,13 +188,13 @@ class _CustomInputFieldState extends State<CustomInputField> {
   }
 }
 
-class CustomPhoneInputField extends StatefulWidget {
+class CustomPhoneInputField extends StatelessWidget {
   final String? label;
   final String? hint;
   final String initialCountryCode;
   final TextEditingController? controller;
-  final void Function(String)? onChanged;
-  final String? Function(String?)? validator;
+  final void Function(String)? onChanged; // returns E.164
+  final String? Function(PhoneNumber?)? validator; // custom validator
   final bool enabled;
   final String? errorText;
   final String? helperText;
@@ -210,27 +213,13 @@ class CustomPhoneInputField extends StatefulWidget {
   });
 
   @override
-  State<CustomPhoneInputField> createState() => _CustomPhoneInputFieldState();
-}
-
-class _CustomPhoneInputFieldState extends State<CustomPhoneInputField> {
-  String _selectedCountryCode = '';
-  String _phoneNumber = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedCountryCode = widget.initialCountryCode;
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.label != null) ...[
+        if (label != null) ...[
           Text(
-            widget.label!,
+            label!,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
               color: AppColors.textPrimary,
               fontWeight: FontWeight.w500,
@@ -238,113 +227,61 @@ class _CustomPhoneInputFieldState extends State<CustomPhoneInputField> {
           ),
           const SizedBox(height: 8),
         ],
-        Container(
-          decoration: BoxDecoration(
-            color: widget.enabled ? Colors.white : AppColors.surfaceVariant,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: widget.errorText != null ? AppColors.error : AppColors.border,
-              width: 1.5,
-            ),
-          ),
-          child: Row(
-            children: [
-              // Country code dropdown
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: DropdownButton<String>(
-                  value: _selectedCountryCode,
-                  underline: const SizedBox(),
-                  items: const [
-                    DropdownMenuItem(value: 'GH', child: Text('+233')),
-                    DropdownMenuItem(value: 'US', child: Text('+1')),
-                    DropdownMenuItem(value: 'UK', child: Text('+44')),
-                    DropdownMenuItem(value: 'NG', child: Text('+234')),
-                  ],
-                  onChanged: widget.enabled
-                      ? (value) {
-                    setState(() {
-                      _selectedCountryCode = value ?? 'GH';
-                    });
-                    _updatePhoneNumber();
-                  }
-                      : null,
-                ),
-              ),
-              Container(
-                width: 1,
-                height: 24,
+        IntlPhoneField(
+          controller: controller,
+          enabled: enabled,
+          initialCountryCode: initialCountryCode,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: InputDecoration(
+            hintText: hint ?? "Enter phone number",
+            filled: true,
+            fillColor: enabled ? Colors.white : AppColors.surfaceVariant,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
                 color: AppColors.border,
+                width: 1.5,
               ),
-              // Phone number input
-              Expanded(
-                child: TextFormField(
-                  controller: widget.controller,
-                  keyboardType: TextInputType.phone,
-                  textInputAction: TextInputAction.next,
-                  enabled: widget.enabled,
-                  onChanged: (value) {
-                    _phoneNumber = value;
-                    _updatePhoneNumber();
-                  },
-                  validator: widget.validator,
-                  decoration: InputDecoration(
-                    hintText: widget.hint ?? 'Enter phone number',
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    errorBorder: InputBorder.none,
-                    focusedErrorBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 16,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
+            errorText: errorText,
+            helperText: helperText,
           ),
+
+          // ✅ Use custom validator if provided, otherwise fallback
+          validator: validator ?? (phone) {
+            if (phone == null || phone.number.isEmpty) {
+              return "Please enter a phone number";
+            }
+
+            final number = phone.number;
+            switch (phone.countryISOCode) {
+              case "GH": // Ghana
+                if (number.length != 9) return "Must be 9 digits";
+                break;
+              case "US": // USA
+                if (number.length != 10) return "Must be 10 digits";
+                break;
+              case "UK": // UK
+                if (number.length < 10 || number.length > 11) {
+                  return "Must be 10–11 digits";
+                }
+                break;
+              case "NG": // Nigeria
+                if (number.length != 10) return "Must be 10 digits";
+                break;
+              default:
+                if (number.length < 6) return "Number too short";
+            }
+
+            return null; // ✅ valid
+          },
+
+          onChanged: (phone) {
+            // ✅ Always returns full E.164 number
+            onChanged?.call(phone.completeNumber);
+          },
         ),
-        if (widget.errorText != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            widget.errorText!,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.error,
-            ),
-          ),
-        ],
-        if (widget.helperText != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            widget.helperText!,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
       ],
     );
-  }
-
-  void _updatePhoneNumber() {
-    final countryCode = _getCountryCode(_selectedCountryCode);
-    final fullNumber = '$countryCode$_phoneNumber';
-    widget.onChanged?.call(fullNumber);
-  }
-
-  String _getCountryCode(String countryCode) {
-    switch (countryCode) {
-      case 'GH':
-        return '+233';
-      case 'US':
-        return '+1';
-      case 'UK':
-        return '+44';
-      case 'NG':
-        return '+234';
-      default:
-        return '+233';
-    }
   }
 }

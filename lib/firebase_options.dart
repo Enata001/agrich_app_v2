@@ -54,6 +54,7 @@ class DefaultFirebaseOptions {
     appId: '1:89578726597:ios:db08647eb4b631ecfdfcac',
     messagingSenderId: '89578726597',
     projectId: 'agrich-app-v2',
+    databaseURL: 'https://agrich-app-v2-default-rtdb.firebaseio.com',
     storageBucket: 'agrich-app-v2.firebasestorage.app',
     iosBundleId: 'com.example.agrichAppV2',
   );
@@ -63,6 +64,7 @@ class DefaultFirebaseOptions {
     appId: '1:89578726597:android:9ff47f8089730df2fdfcac',
     messagingSenderId: '89578726597',
     projectId: 'agrich-app-v2',
+    databaseURL: 'https://agrich-app-v2-default-rtdb.firebaseio.com',
     storageBucket: 'agrich-app-v2.firebasestorage.app',
   );
 

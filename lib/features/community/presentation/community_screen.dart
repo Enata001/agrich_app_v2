@@ -1,14 +1,17 @@
-import 'package:agrich_app_v2/features/community/presentation/widgets/post_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../shared/widgets/gradient_background.dart';
+import '../../shared/widgets/loading_indicator.dart';
+import '../../auth/providers/auth_provider.dart';
 import 'providers/community_provider.dart';
+import 'widgets/post_card.dart';
 
 class CommunityScreen extends ConsumerStatefulWidget {
   const CommunityScreen({super.key});
@@ -24,10 +27,16 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   bool get wantKeepAlive => true;
 
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+
+  String _currentFilter = 'recent';
+  String _searchQuery = '';
+  bool _showSearch = false;
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -35,7 +44,11 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   Widget build(BuildContext context) {
     super.build(context);
 
-    final posts = ref.watch(communityPostsProvider);
+    final postsAsync = _searchQuery.isNotEmpty
+        ? ref.watch(searchPostsProvider(_searchQuery))
+        : _currentFilter != 'recent'
+        ? ref.watch(filteredPostsProvider(_currentFilter))
+        : ref.watch(communityPostsProvider);
 
     return GradientBackground(
       floatingActionButton: _buildFloatingActionButton(context),
@@ -43,11 +56,13 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
         child: Column(
           children: [
             _buildHeader(context),
+            if (_showSearch) _buildSearchBar(),
+            _buildFilterChips(),
             Expanded(
-              child: posts.when(
+              child: postsAsync.when(
                 data: (postsList) => _buildPostsList(context, postsList),
                 loading: () => _buildLoadingState(),
-                error: (error, stack) => _buildErrorState(context),
+                error: (error, stack) => _buildErrorState(context, error),
               ),
             ),
           ],
@@ -63,35 +78,149 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
         padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            Icon(
-              Icons.people,
-              color: Colors.white,
-              size: 28,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Community',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+            if (_showSearch) ...[
+              IconButton(
+                onPressed: () {
+                  setState(() {
+                    _showSearch = false;
+                    _searchQuery = '';
+                    _searchController.clear();
+                  });
+                },
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
               ),
-            ),
+            ] else ...[
+              const Icon(Icons.people, color: Colors.white, size: 28),
+              const SizedBox(width: 12),
+              Text(
+                'Community',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
             const Spacer(),
-            IconButton(
-              onPressed: () => _showSearchDialog(context),
-              icon: const Icon(
-                Icons.search,
-                color: Colors.white,
+            if (!_showSearch) ...[
+              IconButton(
+                onPressed: () => setState(() => _showSearch = true),
+                icon: const Icon(Icons.search, color: Colors.white),
               ),
-            ),
-            IconButton(
-              onPressed: () => _showFilterDialog(context),
-              icon: const Icon(
-                Icons.filter_list,
-                color: Colors.white,
+              IconButton(
+                onPressed: () => _showFilterBottomSheet(context),
+                icon: const Icon(Icons.tune, color: Colors.white),
               ),
-            ),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return FadeInDown(
+      duration: const Duration(milliseconds: 400),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: TextField(
+          controller: _searchController,
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: 'Search posts...',
+            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+            filled: true,
+            fillColor: Colors.white.withValues(alpha: 0.2),
+            prefixIcon: const Icon(Icons.search, color: Colors.white),
+            suffixIcon: _searchController.text.isNotEmpty
+                ? IconButton(
+              onPressed: () {
+                setState(() {
+                  _searchController.clear();
+                  _searchQuery = '';
+                });
+              },
+              icon: const Icon(Icons.clear, color: Colors.white),
+            )
+                : null,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(25),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          style: const TextStyle(color: Colors.white),
+          onChanged: (value) {
+            setState(() {
+              _searchQuery = value;
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChips() {
+    final filters = [
+      {'key': 'recent', 'label': 'Recent', 'icon': Icons.access_time},
+      {'key': 'popular', 'label': 'Popular', 'icon': Icons.trending_up},
+      {'key': 'most_liked', 'label': 'Most Liked', 'icon': Icons.favorite},
+      {'key': 'most_comments', 'label': 'Most Comments', 'icon': Icons.comment},
+    ];
+
+    return FadeInUp(
+      duration: const Duration(milliseconds: 600),
+      delay: const Duration(milliseconds: 200),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: filters.map((filter) {
+              final isSelected = _currentFilter == filter['key'];
+              return Container(
+                margin: const EdgeInsets.only(right: 12),
+                child: GestureDetector(
+                  onTap: () => _applyFilter(filter['key'] as String),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isSelected
+                            ? Colors.transparent
+                            : Colors.white.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          filter['icon'] as IconData,
+                          size: 16,
+                          color: isSelected
+                              ? AppColors.primaryGreen
+                              : Colors.white,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          filter['label'] as String,
+                          style: TextStyle(
+                            color: isSelected
+                                ? AppColors.primaryGreen
+                                : Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
         ),
       ),
     );
@@ -105,14 +234,23 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(communityPostsProvider);
-        await Future.delayed(const Duration(seconds: 1));
+        if (_currentFilter != 'recent') {
+          ref.invalidate(filteredPostsProvider(_currentFilter));
+        }
+        if (_searchQuery.isNotEmpty) {
+          ref.invalidate(searchPostsProvider(_searchQuery));
+        }
       },
       color: AppColors.primaryGreen,
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: posts.length,
+        itemCount: posts.length + 1, // +1 for load more indicator
         itemBuilder: (context, index) {
+          if (index == posts.length) {
+            return _buildLoadMoreIndicator();
+          }
+
           final post = posts[index];
           return FadeInUp(
             duration: const Duration(milliseconds: 600),
@@ -125,10 +263,25 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                 onLike: () => _likePost(post['id'] ?? ''),
                 onComment: () => _navigateToPostDetails(context, post['id'] ?? ''),
                 onShare: () => _sharePost(post),
+                onSave: () => _savePost(post['id'] ?? ''),
+                onReport: () => _reportPost(post['id'] ?? ''),
               ),
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildLoadMoreIndicator() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: const Center(
+        child: LoadingIndicator(
+          size: LoadingSize.small,
+          color: Colors.white,
+          message: 'Loading more posts...',
+        ),
       ),
     );
   }
@@ -146,18 +299,18 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                 width: 120,
                 height: 120,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(60),
                 ),
                 child: Icon(
-                  Icons.people_outline,
+                  _searchQuery.isNotEmpty ? Icons.search_off : Icons.people_outline,
                   size: 60,
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                 ),
               ),
               const SizedBox(height: 24),
               Text(
-                'No posts yet',
+                _searchQuery.isNotEmpty ? 'No results found' : 'No posts yet',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -165,25 +318,30 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
               ),
               const SizedBox(height: 12),
               Text(
-                'Be the first to share something with the community!',
+                _searchQuery.isNotEmpty
+                    ? 'Try searching with different keywords'
+                    : 'Be the first to share something with the community!',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: () => _navigateToCreatePost(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: AppColors.primaryGreen,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
+              if (_searchQuery.isEmpty) ...[
+                ElevatedButton.icon(
+                  onPressed: () => _navigateToCreatePost(context),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Create First Post'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppColors.primaryGreen,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                   ),
                 ),
-                child: const Text('Create First Post'),
-              ),
+              ],
             ],
           ),
         ),
@@ -192,24 +350,16 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   }
 
   Widget _buildLoadingState() {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: 5,
-      itemBuilder: (context, index) {
-        return FadeInUp(
-          duration: const Duration(milliseconds: 600),
-          delay: Duration(milliseconds: index * 100),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            child: const PostShimmer(),
-          ),
-        );
-      },
+    return const Center(
+      child: LoadingIndicator(
+        size: LoadingSize.large,
+        color: Colors.white,
+        message: 'Loading community posts...',
+      ),
     );
   }
 
-  // FIXED: Add missing _buildErrorState method
-  Widget _buildErrorState(BuildContext context) {
+  Widget _buildErrorState(BuildContext context, Object error) {
     return Center(
       child: FadeIn(
         duration: const Duration(milliseconds: 800),
@@ -218,22 +368,14 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(60),
-                ),
-                child: Icon(
-                  Icons.error_outline,
-                  size: 60,
-                  color: Colors.white.withOpacity(0.7),
-                ),
+              Icon(
+                Icons.error_outline,
+                size: 80,
+                color: Colors.white.withValues(alpha: 0.7),
               ),
               const SizedBox(height: 24),
               Text(
-                'Something went wrong',
+                'Unable to load posts',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -241,17 +383,25 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
               ),
               const SizedBox(height: 12),
               Text(
-                'Unable to load posts. Please check your internet connection and try again.',
+                'Please check your internet connection and try again.',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
-              ElevatedButton(
+              ElevatedButton.icon(
                 onPressed: () {
                   ref.invalidate(communityPostsProvider);
+                  if (_currentFilter != 'recent') {
+                    ref.invalidate(filteredPostsProvider(_currentFilter));
+                  }
+                  if (_searchQuery.isNotEmpty) {
+                    ref.invalidate(searchPostsProvider(_searchQuery));
+                  }
                 },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Try Again'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: AppColors.primaryGreen,
@@ -260,7 +410,6 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                     vertical: 12,
                   ),
                 ),
-                child: const Text('Try Again'),
               ),
             ],
           ),
@@ -279,8 +428,95 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text('New Post'),
+        heroTag: "community_fab", // Unique tag to avoid conflicts
       ),
     );
+  }
+
+  void _showFilterBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.tune, color: AppColors.primaryGreen),
+                const SizedBox(width: 12),
+                Text(
+                  'Filter Posts',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _buildFilterOption('recent', 'Recent', Icons.access_time, 'Latest posts first'),
+            _buildFilterOption('popular', 'Popular', Icons.trending_up, 'Posts with most engagement'),
+            _buildFilterOption('most_liked', 'Most Liked', Icons.favorite, 'Posts with most likes'),
+            _buildFilterOption('most_comments', 'Most Comments', Icons.comment, 'Posts with most comments'),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterOption(String filterKey, String title, IconData icon, String description) {
+    final isSelected = _currentFilter == filterKey;
+
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primaryGreen.withValues(alpha: 0.1)
+              : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          icon,
+          color: isSelected ? AppColors.primaryGreen : Colors.grey.shade600,
+        ),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          color: isSelected ? AppColors.primaryGreen : null,
+        ),
+      ),
+      subtitle: Text(description),
+      trailing: isSelected
+          ? const Icon(Icons.check, color: AppColors.primaryGreen)
+          : null,
+      onTap: () {
+        Navigator.pop(context);
+        _applyFilter(filterKey);
+      },
+    );
+  }
+
+  void _applyFilter(String filter) {
+    setState(() {
+      _currentFilter = filter;
+      _searchQuery = ''; // Clear search when filtering
+      _searchController.clear();
+    });
   }
 
   void _navigateToCreatePost(BuildContext context) {
@@ -294,86 +530,101 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     );
   }
 
-  void _likePost(String postId) {
-    ref.read(communityRepositoryProvider).likePost(postId);
-    ref.invalidate(communityPostsProvider);
-  }
+  Future<void> _likePost(String postId) async {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) return;
 
-  void _sharePost(Map<String, dynamic> post) {
-    // TODO: Implement share functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Share functionality coming soon!'),
-        backgroundColor: AppColors.info,
-      ),
-    );
-  }
+    try {
+      final communityRepository = ref.read(communityRepositoryProvider);
+      await communityRepository.likePost(postId, currentUser.uid);
 
-  void _showSearchDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Search Posts'),
-        content: TextField(
-          decoration: const InputDecoration(
-            hintText: 'Enter search term...',
-            prefixIcon: Icon(Icons.search),
-            border: OutlineInputBorder(),
-          ),
-          onSubmitted: (query) {
-            Navigator.pop(context);
-            _performSearch(query);
-          },
+      // Refresh the relevant provider
+      ref.invalidate(communityPostsProvider);
+      if (_currentFilter != 'recent') {
+        ref.invalidate(filteredPostsProvider(_currentFilter));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to like post: $e'),
+          backgroundColor: Colors.red,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
+      );
+    }
   }
 
-  void _showFilterDialog(BuildContext context) {
+  Future<void> _sharePost(Map<String, dynamic> post) async {
+    try {
+      final communityRepository = ref.read(communityRepositoryProvider);
+      final shareText = await communityRepository.sharePost(post['id']);
+
+      await SharePlus.instance.share(ShareParams(text: shareText));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to share post: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _savePost(String postId) async {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) return;
+
+    try {
+      final communityRepository = ref.read(communityRepositoryProvider);
+      await communityRepository.savePost(postId, currentUser.uid);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Post saved successfully!'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save post: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _reportPost(String postId) async {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) return;
+
+    final reasons = [
+      'Spam or misleading content',
+      'Inappropriate language',
+      'Harassment or bullying',
+      'False information',
+      'Copyright violation',
+      'Other',
+    ];
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Filter Posts'),
+        title: const Text('Report Post'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ListTile(
-              leading: const Icon(Icons.access_time),
-              title: const Text('Recent'),
-              onTap: () {
-                Navigator.pop(context);
-                _applyFilter('recent');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.trending_up),
-              title: const Text('Popular'),
-              onTap: () {
-                Navigator.pop(context);
-                _applyFilter('popular');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.favorite),
-              title: const Text('Most Liked'),
-              onTap: () {
-                Navigator.pop(context);
-                _applyFilter('most_liked');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.comment),
-              title: const Text('Most Comments'),
-              onTap: () {
-                Navigator.pop(context);
-                _applyFilter('most_comments');
-              },
+            const Text('Why are you reporting this post?'),
+            const SizedBox(height: 16),
+            ...reasons.map(
+                  (reason) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(reason),
+                onTap: () {
+                  Navigator.pop(context);
+                  _submitReport(postId, reason);
+                },
+              ),
             ),
           ],
         ),
@@ -387,195 +638,31 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     );
   }
 
-  void _performSearch(String query) {
-    // TODO: Implement search functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Searching for: $query'),
-        backgroundColor: AppColors.info,
-      ),
-    );
-  }
+  Future<void> _submitReport(String postId, String reason) async {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) return;
 
-  void _applyFilter(String filterType) {
-    // TODO: Implement filter functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Filter applied: $filterType'),
-        backgroundColor: AppColors.info,
-      ),
-    );
-  }
-}
+    try {
+      final communityRepository = ref.read(communityRepositoryProvider);
+      await communityRepository.reportPost(
+        postId: postId,
+        reporterId: currentUser.uid,
+        reason: reason,
+      );
 
-// Shimmer widget for loading state
-class PostShimmer extends StatelessWidget {
-  const PostShimmer({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            children: [
-              ShimmerBox(
-                width: 40,
-                height: 40,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ShimmerBox(
-                      width: MediaQuery.of(context).size.width * 0.3,
-                      height: 14,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    const SizedBox(height: 4),
-                    ShimmerBox(
-                      width: MediaQuery.of(context).size.width * 0.2,
-                      height: 12,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Content
-          ShimmerBox(
-            width: double.infinity,
-            height: 16,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          const SizedBox(height: 8),
-          ShimmerBox(
-            width: MediaQuery.of(context).size.width * 0.8,
-            height: 16,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          const SizedBox(height: 16),
-
-          // Image placeholder
-          ShimmerBox(
-            width: double.infinity,
-            height: 200,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          const SizedBox(height: 16),
-
-          // Actions
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              ShimmerBox(
-                width: 60,
-                height: 32,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              ShimmerBox(
-                width: 60,
-                height: 32,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              ShimmerBox(
-                width: 60,
-                height: 32,
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class ShimmerBox extends StatefulWidget {
-  final double width;
-  final double height;
-  final BorderRadiusGeometry borderRadius;
-
-  const ShimmerBox({
-    super.key,
-    required this.width,
-    required this.height,
-    required this.borderRadius,
-  });
-
-  @override
-  State<ShimmerBox> createState() => _ShimmerBoxState();
-}
-
-class _ShimmerBoxState extends State<ShimmerBox>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    );
-    _animation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.linear,
-    ));
-    _controller.repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return Container(
-          width: widget.width,
-          height: widget.height,
-          decoration: BoxDecoration(
-            borderRadius: widget.borderRadius,
-            gradient: LinearGradient(
-              begin: Alignment(-1.0 - _animation.value, 0.0),
-              end: Alignment(1.0 - _animation.value, 0.0),
-              colors: [
-                Colors.grey.shade300,
-                Colors.grey.shade100,
-                Colors.grey.shade300,
-              ],
-            ),
-          ),
-        );
-      },
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Post reported. Thank you for your feedback.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to report post: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }

@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animate_do/animate_do.dart';
@@ -40,6 +41,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   // Loading states
   bool _isSignInLoading = false;
   bool _isSignUpLoading = false;
+  String _fullPhoneNumber = '';
+
 
   @override
   void initState() {
@@ -266,8 +269,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                 label: 'Phone Number',
                 hint: 'Enter phone number',
                 controller: _signUpPhoneController,
-                onChanged: (phone) => _signUpPhoneController.text = phone,
-                validator: _validatePhone,
+                onChanged: (phone) {
+                  _fullPhoneNumber = phone;
+
+                },
+                validator: (value){
+                  if (value == null || value.number.isEmpty) {
+                    return 'Please enter a valid number';
+                  }
+                  if (value.number.length < 9) {
+                    return 'Enter a valid number';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 20),
               CustomInputField(
@@ -368,12 +382,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
     return null;
   }
 
-  String? _validatePhone(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Please enter your phone number';
-    }
-    return null;
-  }
 
   String? _validateConfirmPassword(String? value) {
     if (value == null || value.isEmpty) {
@@ -420,19 +428,83 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   Future<void> _handleSignUp() async {
     if (!_signUpFormKey.currentState!.validate()) return;
 
+
+
     setState(() => _isSignUpLoading = true);
 
     try {
       final authMethods = ref.read(authMethodsProvider);
+      // final number = _signUpPhoneController.text;
+      // print("Final number: $number"); // already in E.164 format
+
+      // Step 1: Create account with email/password
       await authMethods.signUpWithEmailAndPassword(
         _signUpEmailController.text.trim(),
         _signUpPasswordController.text.trim(),
         _signUpUsernameController.text.trim(),
-        _signUpPhoneController.text.trim(),
+        _fullPhoneNumber,
       );
 
+      // Step 2: Start phone verification to link phone to account
       if (mounted) {
-        context.go(AppRoutes.main);
+        await authMethods.verifyPhoneNumber(
+          phoneNumber: _fullPhoneNumber,
+          verificationCompleted: (PhoneAuthCredential credential) async {
+            // Auto verification completed
+            try {
+              await authMethods.linkPhoneToEmailAccount(
+                _signUpPhoneController.text.trim(),
+                '', // No verification ID needed for auto-verification
+                '', // No SMS code needed for auto-verification
+              );
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Phone number verified automatically!'),
+                    backgroundColor: AppColors.success,
+                  ),
+                );
+                context.go(AppRoutes.main);
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to link phone: $e'),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              }
+            }
+          },
+          verificationFailed: (FirebaseAuthException e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Phone verification failed: ${e.message}'),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+            }
+          },
+          codeSent: (String verificationId, int? resendToken) {
+            // SMS code sent - now navigate to OTP screen
+            if (mounted) {
+              context.push(
+                AppRoutes.otpVerification,
+                extra: {
+                  'verificationId': verificationId,
+                  'phoneNumber': _signUpPhoneController.text.trim(),
+                  'resendToken': resendToken,
+                  'isSignUp': true, // Flag for phone linking after sign-up
+                },
+              );
+            }
+          },
+          codeAutoRetrievalTimeout: (String verificationId) {
+            // Handle timeout if needed
+          },
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -451,19 +523,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   }
 
   void _handlePhoneSignIn() {
-    // Navigate to phone sign-in flow
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Phone Sign In'),
-        content: const Text('Phone sign-in functionality will be implemented here.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+    context.push('/phone-signin');
   }
 }

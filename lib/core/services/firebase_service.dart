@@ -25,12 +25,111 @@ class FirebaseService {
         .get();
   }
 
+  // ENHANCED: Get user by phone number
+  Future<QuerySnapshot> getUserByPhone(String phoneNumber) async {
+    return await _firestore
+        .collection(AppConfig.usersCollection)
+        .where('phoneNumber', isEqualTo: phoneNumber)
+        .limit(1)
+        .get();
+  }
+
+  // ENHANCED: Get user by email
+  Future<QuerySnapshot> getUserByEmail(String email) async {
+    return await _firestore
+        .collection(AppConfig.usersCollection)
+        .where('email', isEqualTo: email)
+        .limit(1)
+        .get();
+  }
+
   Future<void> updateUser(String uid, Map<String, dynamic> userData) async {
     await _firestore.collection(AppConfig.usersCollection).doc(uid).update({
       ...userData,
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
+
+
+  Stream<QuerySnapshot> getChatMessagesStream(String chatId) {
+    return _firestore
+        .collection(AppConfig.chatsCollection)
+        .doc(chatId)
+        .collection(AppConfig.messagesCollection)
+        .orderBy('createdAt', descending: false)
+        .snapshots();
+  }
+
+  Future<DocumentReference> addMessage(
+      String chatId,
+      Map<String, dynamic> messageData,
+      ) async {
+    return await _firestore
+        .collection(AppConfig.chatsCollection)
+        .doc(chatId)
+        .collection(AppConfig.messagesCollection)
+        .add({
+      ...messageData,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<QuerySnapshot> getUnreadMessages(String chatId, String userId) async {
+    return await _firestore
+        .collection(AppConfig.chatsCollection)
+        .doc(chatId)
+        .collection(AppConfig.messagesCollection)
+        .where('senderId', isNotEqualTo: userId)
+        .where('isRead', isEqualTo: false)
+        .get();
+  }
+
+  // ========== MISSING METHODS FOR COMMUNITY REPOSITORY ==========
+
+  Future<QuerySnapshot> getComments(String postId) async {
+    return await _firestore
+        .collection(AppConfig.commentsCollection)
+        .where('postId', isEqualTo: postId)
+        .orderBy('createdAt', descending: false)
+        .get();
+  }
+
+  Future<DocumentReference> addComment(Map<String, dynamic> commentData) async {
+    return await _firestore.collection(AppConfig.commentsCollection).add({
+      ...commentData,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<QuerySnapshot> searchPosts(String query) async {
+    return await _firestore
+        .collection(AppConfig.postsCollection)
+        .where('content', isGreaterThanOrEqualTo: query)
+        .where('content', isLessThanOrEqualTo: '$query\uf8ff')
+        .orderBy('content')
+        .orderBy('createdAt', descending: true)
+        .limit(20)
+        .get();
+  }
+
+
+  Future<QuerySnapshot> getTipsByCategory(String category) async {
+    return await _firestore
+        .collection(AppConfig.tipsCollection)
+        .where('category', isEqualTo: category)
+        .orderBy('createdAt', descending: true)
+        .get();
+  }
+
+
+  Future<QuerySnapshot> getAllVideos() async {
+    return await _firestore
+        .collection(AppConfig.videosCollection)
+        .orderBy('uploadDate', descending: true)
+        .get();
+  }
+
 
   Future<void> deleteUser(String uid) async {
     await _firestore.collection(AppConfig.usersCollection).doc(uid).delete();
@@ -88,20 +187,16 @@ class FirebaseService {
         final likesCount = data['likesCount'] as int? ?? 0;
 
         if (likedBy.contains(userId)) {
-          // Unlike
           likedBy.remove(userId);
           transaction.update(postRef, {
             'likedBy': likedBy,
             'likesCount': likesCount - 1,
-            'updatedAt': FieldValue.serverTimestamp(),
           });
         } else {
-          // Like
           likedBy.add(userId);
           transaction.update(postRef, {
             'likedBy': likedBy,
             'likesCount': likesCount + 1,
-            'updatedAt': FieldValue.serverTimestamp(),
           });
         }
       }
@@ -109,69 +204,119 @@ class FirebaseService {
   }
 
   // Comments Collection Methods
-  Future<QuerySnapshot> getComments(String postId) async {
+  Future<QuerySnapshot> getPostComments(String postId) async {
     return await _firestore
-        .collection(AppConfig.postsCollection)
-        .doc(postId)
         .collection(AppConfig.commentsCollection)
+        .where('postId', isEqualTo: postId)
         .orderBy('createdAt', descending: false)
         .get();
   }
 
-  Future<DocumentReference> addComment(
-    String postId,
-    Map<String, dynamic> commentData,
-  ) async {
-    final batch = _firestore.batch();
-
-    // Add comment
-    final commentRef = _firestore
-        .collection(AppConfig.postsCollection)
-        .doc(postId)
-        .collection(AppConfig.commentsCollection)
-        .doc();
-
-    batch.set(commentRef, {
+  Future<DocumentReference> createComment(Map<String, dynamic> commentData) async {
+    return await _firestore.collection(AppConfig.commentsCollection).add({
       ...commentData,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
-
-    // Update post comments count
-    final postRef = _firestore
-        .collection(AppConfig.postsCollection)
-        .doc(postId);
-    batch.update(postRef, {
-      'commentsCount': FieldValue.increment(1),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-
-    await batch.commit();
-    return commentRef;
   }
 
-  Future<void> deleteComment(String postId, String commentId) async {
-    final batch = _firestore.batch();
-
-    // Delete comment
-    final commentRef = _firestore
-        .collection(AppConfig.postsCollection)
-        .doc(postId)
-        .collection(AppConfig.commentsCollection)
-        .doc(commentId);
-
-    batch.delete(commentRef);
-
-    // Update post comments count
-    final postRef = _firestore
-        .collection(AppConfig.postsCollection)
-        .doc(postId);
-    batch.update(postRef, {
-      'commentsCount': FieldValue.increment(-1),
+  Future<void> updateComment(String commentId, Map<String, dynamic> commentData) async {
+    await _firestore.collection(AppConfig.commentsCollection).doc(commentId).update({
+      ...commentData,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+  }
 
-    await batch.commit();
+  Future<void> deleteComment(String commentId) async {
+    await _firestore.collection(AppConfig.commentsCollection).doc(commentId).delete();
+  }
+
+  // Tips Collection Methods
+  Future<QuerySnapshot> getTips() async {
+    return await _firestore
+        .collection(AppConfig.tipsCollection)
+        .orderBy('createdAt', descending: true)
+        .get();
+  }
+
+  Future<DocumentSnapshot> getDailyTip() async {
+    final today = DateTime.now();
+    final dayOfYear = today.difference(DateTime(today.year, 1, 1)).inDays + 1;
+
+    final snapshot = await _firestore
+        .collection(AppConfig.tipsCollection)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isNotEmpty) {
+      final totalTips = snapshot.size;
+      final tipIndex = dayOfYear % totalTips;
+
+      final tipsSnapshot = await _firestore
+          .collection(AppConfig.tipsCollection)
+          .orderBy('createdAt')
+          .limit(tipIndex + 1)
+          .get();
+
+      return tipsSnapshot.docs.last;
+    }
+
+    throw Exception('No tips available');
+  }
+
+  Future<DocumentReference> createTip(Map<String, dynamic> tipData) async {
+    return await _firestore.collection(AppConfig.tipsCollection).add({
+      ...tipData,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // Videos Collection Methods
+  Future<QuerySnapshot> getVideos() async {
+    return await _firestore
+        .collection(AppConfig.videosCollection)
+        .orderBy('uploadDate', descending: true)
+        .limit(AppConfig.videosPerPage)
+        .get();
+  }
+
+  Future<QuerySnapshot> getVideosByCategory(String category) async {
+    return await _firestore
+        .collection(AppConfig.videosCollection)
+        .where('category', isEqualTo: category)
+        .orderBy('uploadDate', descending: true)
+        .limit(AppConfig.videosPerPage)
+        .get();
+  }
+
+  Future<DocumentSnapshot> getVideo(String videoId) async {
+    return await _firestore
+        .collection(AppConfig.videosCollection)
+        .doc(videoId)
+        .get();
+  }
+
+  Future<DocumentReference> createVideo(Map<String, dynamic> videoData) async {
+    return await _firestore.collection(AppConfig.videosCollection).add({
+      ...videoData,
+      'uploadDate': FieldValue.serverTimestamp(),
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+      'views': 0,
+      'likes': 0,
+    });
+  }
+
+  Future<void> updateVideo(String videoId, Map<String, dynamic> videoData) async {
+    await _firestore.collection(AppConfig.videosCollection).doc(videoId).update({
+      ...videoData,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> deleteVideo(String videoId) async {
+    await _firestore.collection(AppConfig.videosCollection).doc(videoId).delete();
   }
 
   // Chat Collection Methods
@@ -179,7 +324,7 @@ class FirebaseService {
     return await _firestore
         .collection(AppConfig.chatsCollection)
         .where('participants', arrayContains: userId)
-        .orderBy('updatedAt', descending: true)
+        .orderBy('lastMessageAt', descending: true)
         .get();
   }
 
@@ -209,9 +354,44 @@ class FirebaseService {
     await _firestore.collection(AppConfig.chatsCollection).doc(chatId).delete();
   }
 
-  Future<QuerySnapshot> findChatByParticipants(
-    List<String> participants,
-  ) async {
+  // Messages Collection Methods
+  Future<QuerySnapshot> getChatMessages(String chatId) async {
+    return await _firestore
+        .collection(AppConfig.messagesCollection)
+        .where('chatId', isEqualTo: chatId)
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .get();
+  }
+
+  Future<DocumentReference> createMessage(Map<String, dynamic> messageData) async {
+    return await _firestore.collection(AppConfig.messagesCollection).add({
+      ...messageData,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> updateMessage(String messageId, Map<String, dynamic> messageData) async {
+    await _firestore.collection(AppConfig.messagesCollection).doc(messageId).update({
+      ...messageData,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<QuerySnapshot> searchChatMessages(String chatId, String query) async {
+    return await _firestore
+        .collection(AppConfig.messagesCollection)
+        .where('chatId', isEqualTo: chatId)
+        .where('content', isGreaterThanOrEqualTo: query)
+        .where('content', isLessThanOrEqualTo: '$query\uf8ff')
+        .orderBy('content')
+        .orderBy('createdAt', descending: true)
+        .limit(20)
+        .get();
+  }
+
+  Future<QuerySnapshot> findChatByParticipants(List<String> participants) async {
     return await _firestore
         .collection(AppConfig.chatsCollection)
         .where('participants', isEqualTo: participants)
@@ -219,183 +399,12 @@ class FirebaseService {
         .get();
   }
 
-  // Messages Collection Methods
-  Stream<QuerySnapshot> getChatMessagesStream(String chatId) {
-    return _firestore
-        .collection(AppConfig.chatsCollection)
-        .doc(chatId)
-        .collection(AppConfig.messagesCollection)
-        .orderBy('createdAt', descending: false)
-        .snapshots();
-  }
-
-  Future<QuerySnapshot> getChatMessages(String chatId) async {
-    return await _firestore
-        .collection(AppConfig.chatsCollection)
-        .doc(chatId)
-        .collection(AppConfig.messagesCollection)
-        .orderBy('createdAt', descending: false)
-        .get();
-  }
-
-  Future<DocumentReference> addMessage(
-    String chatId,
-    Map<String, dynamic> messageData,
-  ) async {
-    return await _firestore
-        .collection(AppConfig.chatsCollection)
-        .doc(chatId)
-        .collection(AppConfig.messagesCollection)
-        .add({...messageData, 'createdAt': FieldValue.serverTimestamp()});
-  }
-
-  Future<void> updateMessage(
-    String messageId,
-    Map<String, dynamic> messageData,
-  ) async {
-    // Note: This would require knowing the chat ID to construct the full path
-    // For now, we'll implement a simple version
-    final messagesQuery = await _firestore
-        .collectionGroup(AppConfig.messagesCollection)
-        .where(FieldPath.documentId, isEqualTo: messageId)
-        .limit(1)
-        .get();
-
-    if (messagesQuery.docs.isNotEmpty) {
-      await messagesQuery.docs.first.reference.update(messageData);
-    }
-  }
-
-  Future<QuerySnapshot> getUnreadMessages(String chatId, String userId) async {
-    return await _firestore
-        .collection(AppConfig.chatsCollection)
-        .doc(chatId)
-        .collection(AppConfig.messagesCollection)
-        .where('readBy', whereNotIn: [userId])
-        .get();
-  }
-
-  Future<QuerySnapshot> searchChatMessages(String chatId, String query) async {
-    return await _firestore
-        .collection(AppConfig.chatsCollection)
-        .doc(chatId)
-        .collection(AppConfig.messagesCollection)
-        .where('content', isGreaterThanOrEqualTo: query)
-        .where('content', isLessThanOrEqualTo: '$query\uf8ff')
-        .orderBy('content')
-        .orderBy('createdAt', descending: true)
-        .limit(50)
-        .get();
-  }
-
-  // Videos Collection Methods
-  Future<QuerySnapshot> getAllVideos() async {
-    return await _firestore
-        .collection(AppConfig.videosCollection)
-        .orderBy('uploadDate', descending: true)
-        .limit(AppConfig.videosPerPage)
-        .get();
-  }
-
-  Future<QuerySnapshot> getVideosByCategory(String category) async {
-    return await _firestore
-        .collection(AppConfig.videosCollection)
-        .where('category', isEqualTo: category)
-        .orderBy('uploadDate', descending: true)
-        .limit(AppConfig.videosPerPage)
-        .get();
-  }
-
-  Future<DocumentSnapshot> getVideo(String videoId) async {
-    return await _firestore
-        .collection(AppConfig.videosCollection)
-        .doc(videoId)
-        .get();
-  }
-
-  Future<DocumentReference> createVideo(Map<String, dynamic> videoData) async {
-    return await _firestore.collection(AppConfig.videosCollection).add({
-      ...videoData,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'views': 0,
-    });
-  }
-
-  Future<void> updateVideoViews(String videoId) async {
-    await _firestore.collection(AppConfig.videosCollection).doc(videoId).update(
-      {
-        'views': FieldValue.increment(1),
-        'lastViewed': FieldValue.serverTimestamp(),
-      },
-    );
-  }
-
-  // Tips Collection Methods
-  Future<QuerySnapshot> getTips() async {
-    return await _firestore
-        .collection(AppConfig.tipsCollection)
-        .orderBy('createdAt', descending: true)
-        .get();
-  }
-
-  Future<QuerySnapshot> getTipsByCategory(String category) async {
-    return await _firestore
-        .collection(AppConfig.tipsCollection)
-        .where('category', isEqualTo: category)
-        .orderBy('createdAt', descending: true)
-        .get();
-  }
-
-  Future<DocumentSnapshot> getDailyTip() async {
-    final today = DateTime.now();
-    final startOfDay = DateTime(today.year, today.month, today.day);
-    final endOfDay = DateTime(today.year, today.month, today.day, 23, 59, 59);
-
-    final query = await _firestore
-        .collection(AppConfig.tipsCollection)
-        .where(
-          'createdAt',
-          isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
-        )
-        .where('createdAt', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay))
-        .where('isDailyTip', isEqualTo: true)
-        .limit(1)
-        .get();
-
-    if (query.docs.isNotEmpty) {
-      return query.docs.first;
-    }
-
-    // Fallback to random tip
-    final randomTips = await _firestore
-        .collection(AppConfig.tipsCollection)
-        .limit(10)
-        .get();
-
-    if (randomTips.docs.isNotEmpty) {
-      final randomIndex =
-          DateTime.now().millisecondsSinceEpoch % randomTips.docs.length;
-      return randomTips.docs[randomIndex];
-    }
-
-    throw Exception('No tips available');
-  }
-
-  Future<DocumentReference> createTip(Map<String, dynamic> tipData) async {
-    return await _firestore.collection(AppConfig.tipsCollection).add({
-      ...tipData,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-  }
-
   // Storage Methods
   Future<String> uploadImage(
-    String path,
-    String fileName,
-    String folder,
-  ) async {
+      String path,
+      String fileName,
+      String folder,
+      ) async {
     final file = File(path);
     final ref = _storage.ref().child('$folder/$fileName');
 
@@ -454,98 +463,6 @@ class FirebaseService {
     }
   }
 
-  // Batch Operations
-  Future<void> batchWrite(List<Map<String, dynamic>> operations) async {
-    final batch = _firestore.batch();
-
-    for (final operation in operations) {
-      final type = operation['type'] as String;
-      final collection = operation['collection'] as String;
-      final docId = operation['docId'] as String?;
-      final data = operation['data'] as Map<String, dynamic>?;
-
-      switch (type) {
-        case 'create':
-          if (docId != null && data != null) {
-            batch.set(_firestore.collection(collection).doc(docId), data);
-          }
-          break;
-        case 'update':
-          if (docId != null && data != null) {
-            batch.update(_firestore.collection(collection).doc(docId), data);
-          }
-          break;
-        case 'delete':
-          if (docId != null) {
-            batch.delete(_firestore.collection(collection).doc(docId));
-          }
-          break;
-      }
-    }
-
-    await batch.commit();
-  }
-
-  // Search Methods
-  Future<QuerySnapshot> searchPosts(String query) async {
-    return await _firestore
-        .collection(AppConfig.postsCollection)
-        .where('content', isGreaterThanOrEqualTo: query)
-        .where('content', isLessThanOrEqualTo: '$query\uf8ff')
-        .orderBy('content')
-        .orderBy('createdAt', descending: true)
-        .limit(20)
-        .get();
-  }
-
-  Future<QuerySnapshot> searchUsers(String query) async {
-    return await _firestore
-        .collection(AppConfig.usersCollection)
-        .where('username', isGreaterThanOrEqualTo: query)
-        .where('username', isLessThanOrEqualTo: '$query\uf8ff')
-        .orderBy('username')
-        .limit(20)
-        .get();
-  }
-
-  Future<QuerySnapshot> searchVideos(String query) async {
-    return await _firestore
-        .collection(AppConfig.videosCollection)
-        .where('title', isGreaterThanOrEqualTo: query)
-        .where('title', isLessThanOrEqualTo: '$query\uf8ff')
-        .orderBy('title')
-        .orderBy('uploadDate', descending: true)
-        .limit(20)
-        .get();
-  }
-
-  // Analytics Methods
-  Future<void> logUserActivity(
-    String userId,
-    String activity,
-    Map<String, dynamic> data,
-  ) async {
-    await _firestore.collection('user_activities').add({
-      'userId': userId,
-      'activity': activity,
-      'data': data,
-      'timestamp': FieldValue.serverTimestamp(),
-    });
-  }
-
-  Future<void> updateUserLastSeen(String userId) async {
-    await _firestore.collection(AppConfig.usersCollection).doc(userId).update({
-      'lastSeen': FieldValue.serverTimestamp(),
-      'isOnline': true,
-    });
-  }
-
-  Future<void> setUserOffline(String userId) async {
-    await _firestore.collection(AppConfig.usersCollection).doc(userId).update({
-      'isOnline': false,
-    });
-  }
-
   // Pagination Methods
   Future<QuerySnapshot> getPostsPaginated({
     DocumentSnapshot? lastDocument,
@@ -585,9 +502,9 @@ class FirebaseService {
 
   // Notification Methods
   Future<void> sendNotification(
-    String userId,
-    Map<String, dynamic> notificationData,
-  ) async {
+      String userId,
+      Map<String, dynamic> notificationData,
+      ) async {
     await _firestore.collection('notifications').add({
       'userId': userId,
       'type': notificationData['type'],
@@ -657,17 +574,17 @@ class FirebaseService {
   }
 
   Stream<QuerySnapshot> listenToCollection(
-    String collection, {
-    Map<String, dynamic>? where,
-    String? orderBy,
-    bool descending = false,
-    int? limit,
-  }) {
+      String collection, {
+        Map<String, dynamic>? where,
+        String? orderBy,
+        bool descending = false,
+        int? limit,
+      }) {
     Query query = _firestore.collection(collection);
 
     if (where != null) {
-      where.forEach((key, value) {
-        query = query.where(key, isEqualTo: value);
+      where.forEach((field, value) {
+        query = query.where(field, isEqualTo: value);
       });
     }
 
@@ -682,74 +599,49 @@ class FirebaseService {
     return query.snapshots();
   }
 
-  // Backup and Restore Methods
-  Future<Map<String, dynamic>> exportUserData(String userId) async {
-    final userData = <String, dynamic>{};
-
-    // Export user profile
-    final userDoc = await getUser(userId);
-    if (userDoc.exists) {
-      userData['profile'] = userDoc.data();
-    }
-
-    // Export user posts
-    final postsQuery = await _firestore
-        .collection(AppConfig.postsCollection)
-        .where('authorId', isEqualTo: userId)
-        .get();
-    userData['posts'] = postsQuery.docs.map((doc) => doc.data()).toList();
-
-    // Export user comments
-    final commentsQuery = await _firestore
-        .collectionGroup(AppConfig.commentsCollection)
-        .where('authorId', isEqualTo: userId)
-        .get();
-    userData['comments'] = commentsQuery.docs.map((doc) => doc.data()).toList();
-
-    return userData;
-  }
-
-  Future<void> deleteUserData(String userId) async {
+  // Batch Operations
+  Future<void> batchWrite(List<Map<String, dynamic>> operations) async {
     final batch = _firestore.batch();
 
-    // Delete user profile
-    batch.delete(_firestore.collection(AppConfig.usersCollection).doc(userId));
+    for (final operation in operations) {
+      final type = operation['type'] as String;
+      final collection = operation['collection'] as String;
+      final docId = operation['docId'] as String?;
+      final data = operation['data'] as Map<String, dynamic>?;
 
-    // Delete user posts
-    final postsQuery = await _firestore
-        .collection(AppConfig.postsCollection)
-        .where('authorId', isEqualTo: userId)
-        .get();
-
-    for (final doc in postsQuery.docs) {
-      batch.delete(doc.reference);
-    }
-
-    // Delete user comments
-    final commentsQuery = await _firestore
-        .collectionGroup(AppConfig.commentsCollection)
-        .where('authorId', isEqualTo: userId)
-        .get();
-
-    for (final doc in commentsQuery.docs) {
-      batch.delete(doc.reference);
-    }
-
-    // Delete user chats (remove from participants)
-    final chatsQuery = await _firestore
-        .collection(AppConfig.chatsCollection)
-        .where('participants', arrayContains: userId)
-        .get();
-
-    for (final doc in chatsQuery.docs) {
-      final data = doc.data();
-      final participants = List<String>.from(data['participants'] ?? []);
-      participants.remove(userId);
-
-      if (participants.isEmpty) {
-        batch.delete(doc.reference);
-      } else {
-        batch.update(doc.reference, {'participants': participants});
+      switch (type) {
+        case 'create':
+          if (docId != null) {
+            final docRef = _firestore.collection(collection).doc(docId);
+            batch.set(docRef, {
+              ...?data,
+              'createdAt': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          } else {
+            final docRef = _firestore.collection(collection).doc();
+            batch.set(docRef, {
+              ...?data,
+              'createdAt': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          }
+          break;
+        case 'update':
+          if (docId != null) {
+            final docRef = _firestore.collection(collection).doc(docId);
+            batch.update(docRef, {
+              ...?data,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          }
+          break;
+        case 'delete':
+          if (docId != null) {
+            final docRef = _firestore.collection(collection).doc(docId);
+            batch.delete(docRef);
+          }
+          break;
       }
     }
 

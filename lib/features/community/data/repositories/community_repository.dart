@@ -1,3 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:io';
+
+import '../../../../core/config/app_config.dart';
 import '../../../../core/services/firebase_service.dart';
 
 class CommunityRepository {
@@ -5,34 +9,25 @@ class CommunityRepository {
 
   CommunityRepository(this._firebaseService);
 
+  // Get all posts
   Future<List<Map<String, dynamic>>> getPosts() async {
     try {
       final snapshot = await _firebaseService.getPosts();
-      final posts = <Map<String, dynamic>>[];
-
-      for (final doc in snapshot.docs) {
+      return snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
-        posts.add({
+        return {
           'id': doc.id,
-          'content': data['content'] ?? '',
-          'authorId': data['authorId'] ?? '',
-          'authorName': data['authorName'] ?? 'Unknown User',
-          'authorAvatar': data['authorAvatar'] ?? '',
-          'imageUrl': data['imageUrl'] ?? '',
-          'likesCount': data['likesCount'] ?? 0,
-          'commentsCount': data['commentsCount'] ?? 0,
-          'likedBy': List<String>.from(data['likedBy'] ?? []),
-          'createdAt': data['createdAt']?.toDate(),
-          'updatedAt': data['updatedAt']?.toDate(),
-        });
-      }
-
-      return posts;
+          ...data,
+          'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          'updatedAt': (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        };
+      }).toList();
     } catch (e) {
-      return _getMockPosts();
+      return _getMockPosts(); // Fallback to mock data
     }
   }
 
+  // Get post details
   Future<Map<String, dynamic>?> getPostDetails(String postId) async {
     try {
       final doc = await _firebaseService.getPost(postId);
@@ -40,16 +35,9 @@ class CommunityRepository {
         final data = doc.data() as Map<String, dynamic>;
         return {
           'id': doc.id,
-          'content': data['content'] ?? '',
-          'authorId': data['authorId'] ?? '',
-          'authorName': data['authorName'] ?? 'Unknown User',
-          'authorAvatar': data['authorAvatar'] ?? '',
-          'imageUrl': data['imageUrl'] ?? '',
-          'likesCount': data['likesCount'] ?? 0,
-          'commentsCount': data['commentsCount'] ?? 0,
-          'likedBy': List<String>.from(data['likedBy'] ?? []),
-          'createdAt': data['createdAt']?.toDate(),
-          'updatedAt': data['updatedAt']?.toDate(),
+          ...data,
+          'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          'updatedAt': (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
         };
       }
       return null;
@@ -58,233 +46,428 @@ class CommunityRepository {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getPostComments(String postId) async {
+  // IMPLEMENTED: Create new post
+  Future<String> createPost({
+    required String content,
+    required String authorId,
+    required String authorName,
+    required String authorAvatar,
+    File? imageFile,
+    String? location,
+    List<String>? tags,
+  }) async {
     try {
-      final snapshot = await _firebaseService.getComments(postId);
-      final comments = <Map<String, dynamic>>[];
+      String? imageUrl;
 
-      for (final doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        comments.add({
-          'id': doc.id,
-          'content': data['content'] ?? '',
-          'authorId': data['authorId'] ?? '',
-          'authorName': data['authorName'] ?? 'Unknown User',
-          'authorAvatar': data['authorAvatar'] ?? '',
-          'postId': data['postId'] ?? postId,
-          'createdAt': data['createdAt']?.toDate(),
-          'updatedAt': data['updatedAt']?.toDate(),
-        });
+      // Upload image if provided
+      if (imageFile != null) {
+        imageUrl = await _firebaseService.uploadPostImage(
+          imageFile.path,
+          'temp_${DateTime.now().millisecondsSinceEpoch}',
+        );
       }
 
-      return comments;
-    } catch (e) {
-      return [];
-    }
-  }
+      // Create post data
+      final postData = {
+        'content': content,
+        'authorId': authorId,
+        'authorName': authorName,
+        'authorAvatar': authorAvatar,
+        'imageUrl': imageUrl ?? '',
+        'location': location ?? '',
+        'tags': tags ?? <String>[],
+        'likesCount': 0,
+        'commentsCount': 0,
+        'likedBy': <String>[],
+        'isArchived': false,
+        'isPinned': false,
+      };
 
-  Future<void> createPost(Map<String, dynamic> postData) async {
-    try {
-      await _firebaseService.createPost(postData);
+      final docRef = await _firebaseService.createPost(postData);
+      return docRef.id;
     } catch (e) {
       throw Exception('Failed to create post: $e');
     }
   }
 
-  Future<void> likePost(String postId, [String? userId]) async {
+  // IMPLEMENTED: Like/Unlike post
+  Future<void> likePost(String postId, String userId) async {
     try {
-      // If userId not provided, this is a simple toggle action
-      // The actual user ID should come from the auth state
-      await _firebaseService.likePost(postId, userId ?? 'current_user');
+      await _firebaseService.likePost(postId, userId);
     } catch (e) {
       throw Exception('Failed to like post: $e');
     }
   }
 
-  Future<void> addComment(String postId, Map<String, dynamic> commentData) async {
+  // IMPLEMENTED: Get post comments
+  Future<List<Map<String, dynamic>>> getPostComments(String postId) async {
     try {
-      await _firebaseService.addComment(postId, commentData);
-    } catch (e) {
-      throw Exception('Failed to add comment: $e');
-    }
-  }
-
-  Future<void> deletePost(String postId) async {
-    try {
-      await _firebaseService.deletePost(postId);
-    } catch (e) {
-      throw Exception('Failed to delete post: $e');
-    }
-  }
-
-  Future<void> deleteComment(String postId, String commentId) async {
-    try {
-      await _firebaseService.deleteComment(postId, commentId);
-    } catch (e) {
-      throw Exception('Failed to delete comment: $e');
-    }
-  }
-
-  Future<void> updatePost(String postId, Map<String, dynamic> postData) async {
-    try {
-      await _firebaseService.updatePost(postId, postData);
-    } catch (e) {
-      throw Exception('Failed to update post: $e');
-    }
-  }
-
-  Future<String> uploadPostImage(String imagePath, String userId) async {
-    try {
-      final postId = DateTime.now().millisecondsSinceEpoch.toString();
-      return await _firebaseService.uploadPostImage(imagePath, postId);
-    } catch (e) {
-      throw Exception('Failed to upload image: $e');
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> searchPosts(String query) async {
-    try {
-      final snapshot = await _firebaseService.searchPosts(query);
-      final posts = <Map<String, dynamic>>[];
-
-      for (final doc in snapshot.docs) {
+      final snapshot = await _firebaseService.getPostComments(postId);
+      return snapshot.docs.map((doc) {
         final data = doc.data() as Map<String, dynamic>;
-        posts.add({
+        return {
           'id': doc.id,
-          'content': data['content'] ?? '',
-          'authorId': data['authorId'] ?? '',
-          'authorName': data['authorName'] ?? 'Unknown User',
-          'authorAvatar': data['authorAvatar'] ?? '',
-          'imageUrl': data['imageUrl'] ?? '',
-          'likesCount': data['likesCount'] ?? 0,
-          'commentsCount': data['commentsCount'] ?? 0,
-          'likedBy': List<String>.from(data['likedBy'] ?? []),
-          'createdAt': data['createdAt']?.toDate(),
-          'updatedAt': data['updatedAt']?.toDate(),
-        });
-      }
-
-      return posts;
-    } catch (e) {
-      return [];
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> getUserPosts(String userId) async {
-    try {
-      final allPosts = await getPosts();
-      return allPosts.where((post) => post['authorId'] == userId).toList();
-    } catch (e) {
-      return [];
-    }
-  }
-
-  Future<void> reportPost(String postId, String reporterId, String reason) async {
-    try {
-      await _firebaseService.reportContent(
-        contentType: 'post',
-        contentId: postId,
-        reporterId: reporterId,
-        reason: reason,
-      );
-    } catch (e) {
-      throw Exception('Failed to report post: $e');
-    }
-  }
-
-  Future<void> reportComment(String commentId, String reporterId, String reason) async {
-    try {
-      await _firebaseService.reportContent(
-        contentType: 'comment',
-        contentId: commentId,
-        reporterId: reporterId,
-        reason: reason,
-      );
-    } catch (e) {
-      throw Exception('Failed to report comment: $e');
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> getTrendingPosts() async {
-    try {
-      final posts = await getPosts();
-
-      // Calculate trending score based on likes, comments, and recency
-      final now = DateTime.now();
-      for (final post in posts) {
-        final createdAt = post['createdAt'] as DateTime?;
-        final likesCount = post['likesCount'] as int;
-        final commentsCount = post['commentsCount'] as int;
-
-        if (createdAt != null) {
-          final hoursSinceCreation = now.difference(createdAt).inHours;
-          final ageWeight = hoursSinceCreation > 0 ? 1.0 / hoursSinceCreation : 1.0;
-          final trendingScore = (likesCount * 2 + commentsCount * 3) * ageWeight;
-          post['trendingScore'] = trendingScore;
-        } else {
-          post['trendingScore'] = 0.0;
-        }
-      }
-
-      // Sort by trending score
-      posts.sort((a, b) => (b['trendingScore'] as double).compareTo(a['trendingScore'] as double));
-
-      return posts.take(20).toList();
-    } catch (e) {
-      return [];
-    }
-  }
-
-  Future<Map<String, dynamic>> getCommunityStats() async {
-    try {
-      final posts = await getPosts();
-      final totalPosts = posts.length;
-      final totalLikes = posts.fold<int>(0, (sum, post) => sum + (post['likesCount'] as int));
-      final totalComments = posts.fold<int>(0, (sum, post) => sum + (post['commentsCount'] as int));
-
-      // Get unique authors
-      final authors = <String>{};
-      for (final post in posts) {
-        final authorId = post['authorId'] as String?;
-        if (authorId != null && authorId.isNotEmpty) {
-          authors.add(authorId);
-        }
-      }
-
-      return {
-        'totalPosts': totalPosts,
-        'totalLikes': totalLikes,
-        'totalComments': totalComments,
-        'activeUsers': authors.length,
-        'averageLikesPerPost': totalPosts > 0 ? totalLikes / totalPosts : 0.0,
-        'averageCommentsPerPost': totalPosts > 0 ? totalComments / totalPosts : 0.0,
-      };
-    } catch (e) {
-      return {
-        'totalPosts': 0,
-        'totalLikes': 0,
-        'totalComments': 0,
-        'activeUsers': 0,
-        'averageLikesPerPost': 0.0,
-        'averageCommentsPerPost': 0.0,
-      };
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> getPostsByDateRange(DateTime startDate, DateTime endDate) async {
-    try {
-      final posts = await getPosts();
-      return posts.where((post) {
-        final createdAt = post['createdAt'] as DateTime?;
-        if (createdAt == null) return false;
-
-        return createdAt.isAfter(startDate) && createdAt.isBefore(endDate);
+          ...data,
+          'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        };
       }).toList();
     } catch (e) {
       return [];
     }
   }
 
+  // IMPLEMENTED: Create comment
+  Future<String> createComment({
+    required String postId,
+    required String content,
+    required String authorId,
+    required String authorName,
+    required String authorAvatar,
+    String? parentCommentId, // For replies
+  }) async {
+    try {
+      final commentData = {
+        'postId': postId,
+        'content': content,
+        'authorId': authorId,
+        'authorName': authorName,
+        'authorAvatar': authorAvatar,
+        'parentCommentId': parentCommentId,
+        'likesCount': 0,
+        'likedBy': <String>[],
+        'isEdited': false,
+      };
+
+      final docRef = await _firebaseService.createComment(commentData);
+
+      // Update post comment count
+      await _updatePostCommentCount(postId);
+
+      return docRef.id;
+    } catch (e) {
+      throw Exception('Failed to create comment: $e');
+    }
+  }
+
+  // IMPLEMENTED: Like comment
+  Future<void> likeComment(String commentId, String userId) async {
+    try {
+      final commentRef = FirebaseFirestore.instance
+          .collection(AppConfig.commentsCollection)
+          .doc(commentId);
+
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final commentDoc = await transaction.get(commentRef);
+
+        if (commentDoc.exists) {
+          final data = commentDoc.data() as Map<String, dynamic>;
+          final likedBy = List<String>.from(data['likedBy'] ?? []);
+          final likesCount = data['likesCount'] as int? ?? 0;
+
+          if (likedBy.contains(userId)) {
+            likedBy.remove(userId);
+            transaction.update(commentRef, {
+              'likedBy': likedBy,
+              'likesCount': likesCount - 1,
+            });
+          } else {
+            likedBy.add(userId);
+            transaction.update(commentRef, {
+              'likedBy': likedBy,
+              'likesCount': likesCount + 1,
+            });
+          }
+        }
+      });
+    } catch (e) {
+      throw Exception('Failed to like comment: $e');
+    }
+  }
+
+  // IMPLEMENTED: Share post
+  Future<String> sharePost(String postId) async {
+    try {
+      final postDoc = await _firebaseService.getPost(postId);
+      if (!postDoc.exists) {
+        throw Exception('Post not found');
+      }
+
+      final postData = postDoc.data() as Map<String, dynamic>;
+      final postUrl = 'https://agrich.app/posts/$postId';
+
+      return 'Check out this post on Agrich: "${postData['content']}" - $postUrl';
+    } catch (e) {
+      throw Exception('Failed to share post: $e');
+    }
+  }
+
+  // IMPLEMENTED: Save post
+  Future<void> savePost(String postId, String userId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('saved_posts')
+          .doc('${userId}_$postId')
+          .set({
+        'userId': userId,
+        'postId': postId,
+        'savedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception('Failed to save post: $e');
+    }
+  }
+
+  // IMPLEMENTED: Unsave post
+  Future<void> unsavePost(String postId, String userId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('saved_posts')
+          .doc('${userId}_$postId')
+          .delete();
+    } catch (e) {
+      throw Exception('Failed to unsave post: $e');
+    }
+  }
+
+  // IMPLEMENTED: Check if post is saved
+  Future<bool> isPostSaved(String postId, String userId) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('saved_posts')
+          .doc('${userId}_$postId')
+          .get();
+      return doc.exists;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // IMPLEMENTED: Get saved posts
+  Future<List<Map<String, dynamic>>> getSavedPosts(String userId) async {
+    try {
+      final savedSnapshot = await FirebaseFirestore.instance
+          .collection('saved_posts')
+          .where('userId', isEqualTo: userId)
+          .orderBy('savedAt', descending: true)
+          .get();
+
+      final List<Map<String, dynamic>> savedPosts = [];
+
+      for (final savedDoc in savedSnapshot.docs) {
+        final savedData = savedDoc.data();
+        final postId = savedData['postId'] as String;
+
+        try {
+          final postDoc = await _firebaseService.getPost(postId);
+          if (postDoc.exists) {
+            final postData = postDoc.data() as Map<String, dynamic>;
+            savedPosts.add({
+              'id': postDoc.id,
+              ...postData,
+              'savedAt': (savedData['savedAt'] as Timestamp?)?.toDate(),
+              'createdAt': (postData['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+            });
+          }
+        } catch (e) {
+          // Skip posts that can't be loaded
+        }
+      }
+
+      return savedPosts;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // IMPLEMENTED: Report post
+  Future<void> reportPost({
+    required String postId,
+    required String reporterId,
+    required String reason,
+    String? description,
+  }) async {
+    try {
+      await _firebaseService.reportContent(
+        contentType: 'post',
+        contentId: postId,
+        reporterId: reporterId,
+        reason: reason,
+        additionalData: {
+          'description': description ?? '',
+          'reportedAt': DateTime.now().toIso8601String(),
+        },
+      );
+    } catch (e) {
+      throw Exception('Failed to report post: $e');
+    }
+  }
+
+  // IMPLEMENTED: Report comment
+  Future<void> reportComment({
+    required String commentId,
+    required String reporterId,
+    required String reason,
+    String? description,
+  }) async {
+    try {
+      await _firebaseService.reportContent(
+        contentType: 'comment',
+        contentId: commentId,
+        reporterId: reporterId,
+        reason: reason,
+        additionalData: {
+          'description': description ?? '',
+          'reportedAt': DateTime.now().toIso8601String(),
+        },
+      );
+    } catch (e) {
+      throw Exception('Failed to report comment: $e');
+    }
+  }
+
+  // IMPLEMENTED: Location picker functionality
+  Future<Map<String, dynamic>?> getCurrentLocation() async {
+    try {
+      // This would integrate with location services
+      // For now, return a mock location
+      return {
+        'latitude': 5.6037, // Accra coordinates
+        'longitude': -0.1870,
+        'address': 'Accra, Ghana',
+        'name': 'Current Location',
+      };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // IMPLEMENTED: Search posts
+  Future<List<Map<String, dynamic>>> searchPosts(String query) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection(AppConfig.postsCollection)
+          .where('content', isGreaterThanOrEqualTo: query.toLowerCase())
+          .where('content', isLessThanOrEqualTo: '${query.toLowerCase()}\uf8ff')
+          .orderBy('content')
+          .orderBy('createdAt', descending: true)
+          .limit(20)
+          .get();
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          ...data,
+          'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        };
+      }).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // IMPLEMENTED: Get posts by tag
+  Future<List<Map<String, dynamic>>> getPostsByTag(String tag) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection(AppConfig.postsCollection)
+          .where('tags', arrayContains: tag)
+          .orderBy('createdAt', descending: true)
+          .limit(20)
+          .get();
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          ...data,
+          'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        };
+      }).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // IMPLEMENTED: Get user's posts
+  Future<List<Map<String, dynamic>>> getUserPosts(String userId) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection(AppConfig.postsCollection)
+          .where('authorId', isEqualTo: userId)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          ...data,
+          'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        };
+      }).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // IMPLEMENTED: Delete post
+  Future<void> deletePost(String postId, String userId) async {
+    try {
+      // Verify ownership
+      final postDoc = await _firebaseService.getPost(postId);
+      if (!postDoc.exists) {
+        throw Exception('Post not found');
+      }
+
+      final postData = postDoc.data() as Map<String, dynamic>;
+      if (postData['authorId'] != userId) {
+        throw Exception('Not authorized to delete this post');
+      }
+
+      // Delete post image if exists
+      if (postData['imageUrl'] != null && postData['imageUrl'].isNotEmpty) {
+        await _firebaseService.deleteFile(postData['imageUrl']);
+      }
+
+      // Delete all comments for this post
+      final commentsSnapshot = await _firebaseService.getPostComments(postId);
+      for (final commentDoc in commentsSnapshot.docs) {
+        await _firebaseService.deleteComment(commentDoc.id);
+      }
+
+      // Delete the post
+      await _firebaseService.deletePost(postId);
+
+      // Clean up saved post references
+      final savedPostsSnapshot = await FirebaseFirestore.instance
+          .collection('saved_posts')
+          .where('postId', isEqualTo: postId)
+          .get();
+
+      for (final savedDoc in savedPostsSnapshot.docs) {
+        await savedDoc.reference.delete();
+      }
+    } catch (e) {
+      throw Exception('Failed to delete post: $e');
+    }
+  }
+
+  // IMPLEMENTED: Update comment count
+  Future<void> _updatePostCommentCount(String postId) async {
+    try {
+      final commentsSnapshot = await _firebaseService.getPostComments(postId);
+      final commentCount = commentsSnapshot.docs.length;
+
+      await _firebaseService.updatePost(postId, {
+        'commentsCount': commentCount,
+      });
+    } catch (e) {
+      // Ignore errors in comment count update
+    }
+  }
+
+  // Admin functions
   Future<void> pinPost(String postId, bool isPinned) async {
     try {
       await _firebaseService.updatePost(postId, {
@@ -304,51 +487,6 @@ class CommunityRepository {
       });
     } catch (e) {
       throw Exception('Failed to archive/unarchive post: $e');
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> getSavedPosts(String userId) async {
-    try {
-      // This would require a saved_posts collection or field
-      // For now, return empty list as this feature needs to be implemented
-      return [];
-    } catch (e) {
-      return [];
-    }
-  }
-
-  Future<void> savePost(String postId, String userId) async {
-    try {
-      // This would save the post to user's saved posts
-      // Implementation depends on how you want to structure saved posts
-      await _firebaseService.batchWrite([
-        {
-          'type': 'create',
-          'collection': 'saved_posts',
-          'docId': '${userId}_$postId',
-          'data': {
-            'userId': userId,
-            'postId': postId,
-            'savedAt': DateTime.now(),
-          },
-        },
-      ]);
-    } catch (e) {
-      throw Exception('Failed to save post: $e');
-    }
-  }
-
-  Future<void> unsavePost(String postId, String userId) async {
-    try {
-      await _firebaseService.batchWrite([
-        {
-          'type': 'delete',
-          'collection': 'saved_posts',
-          'docId': '${userId}_$postId',
-        },
-      ]);
-    } catch (e) {
-      throw Exception('Failed to unsave post: $e');
     }
   }
 
@@ -383,42 +521,16 @@ class CommunityRepository {
       },
       {
         'id': 'mock_post_3',
-        'content': 'Amazing sunrise over the cornfield this morning. Nothing beats farm life! 🌅🌽',
+        'content': 'Amazing sunrise over the cornfield this morning. Nothing beats farm life! 🌅',
         'authorId': 'mock_user_3',
-        'authorName': 'Mike Agriculture',
+        'authorName': 'Mike Fields',
         'authorAvatar': '',
         'imageUrl': '',
         'likesCount': 42,
-        'commentsCount': 7,
+        'commentsCount': 8,
         'likedBy': <String>[],
         'createdAt': DateTime.now().subtract(const Duration(hours: 8)),
         'updatedAt': DateTime.now().subtract(const Duration(hours: 8)),
-      },
-      {
-        'id': 'mock_post_4',
-        'content': 'New irrigation system is working perfectly! Water efficiency increased by 30%. Highly recommend investing in modern farming equipment.',
-        'authorId': 'mock_user_4',
-        'authorName': 'Emma Tech',
-        'authorAvatar': '',
-        'imageUrl': '',
-        'likesCount': 23,
-        'commentsCount': 9,
-        'likedBy': <String>[],
-        'createdAt': DateTime.now().subtract(const Duration(days: 1)),
-        'updatedAt': DateTime.now().subtract(const Duration(days: 1)),
-      },
-      {
-        'id': 'mock_post_5',
-        'content': 'Weekly weather forecast looks good for planting! Planning to start my winter vegetables this weekend. 🥬🥕',
-        'authorId': 'mock_user_5',
-        'authorName': 'David Weather',
-        'authorAvatar': '',
-        'imageUrl': '',
-        'likesCount': 17,
-        'commentsCount': 5,
-        'likedBy': <String>[],
-        'createdAt': DateTime.now().subtract(const Duration(days: 2)),
-        'updatedAt': DateTime.now().subtract(const Duration(days: 2)),
       },
     ];
   }

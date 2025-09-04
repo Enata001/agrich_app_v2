@@ -205,7 +205,7 @@ class CustomScaffold extends StatelessWidget {
       body: scaffoldBody,
       bottomNavigationBar: bottomNavigationBar,
       floatingActionButton: floatingActionButton,
-      floatingActionButtonLocation: floatingActionButtonLocation,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       resizeToAvoidBottomInset: resizeToAvoidBottomInset,
       backgroundColor: showGradient ? Colors.transparent : AppColors.background,
     );

@@ -13,4 +13,6 @@ class AppRoutes {
   static const String postDetails = '/post-details';
   static const String chatList = '/chat-list';
   static const String chat = '/chat';
+  static const String phoneSignIn = '/phone-signin';
+  static const String newPassword = '/new-password';
 }

@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:animate_do/animate_do.dart';
 
 import '../../../../core/theme/app_colors.dart';
 
-class PostCard extends StatelessWidget {
+
+class PostCard extends StatefulWidget {
   final Map<String, dynamic> post;
   final VoidCallback? onTap;
   final VoidCallback? onLike;
   final VoidCallback? onComment;
   final VoidCallback? onShare;
-  final VoidCallback? onAuthorTap;
-  final bool showActions;
+  final VoidCallback? onSave;
+  final VoidCallback? onReport;
 
   const PostCard({
     super.key,
@@ -20,113 +22,148 @@ class PostCard extends StatelessWidget {
     this.onLike,
     this.onComment,
     this.onShare,
-    this.onAuthorTap,
-    this.showActions = true,
+    this.onSave,
+    this.onReport,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final content = post['content'] as String? ?? '';
-    final authorName = post['authorName'] as String? ?? 'Unknown User';
-    final authorAvatar = post['authorAvatar'] as String? ?? '';
-    final imageUrl = post['imageUrl'] as String? ?? '';
-    final likesCount = post['likesCount'] as int? ?? 0;
-    final commentsCount = post['commentsCount'] as int? ?? 0;
-    final createdAt = post['createdAt'] as DateTime?;
-    final likedBy = post['likedBy'] as List<dynamic>? ?? [];
-    final isLiked = false; // TODO: Check if current user liked this post
+  State<PostCard> createState() => _PostCardState();
+}
 
+class _PostCardState extends State<PostCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+  bool _isLiked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.1,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+
+    // Check if post is already liked (this would come from your state management)
+    _isLiked = false; // You can implement this based on your data structure
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Post Header
-            _buildPostHeader(context, authorName, authorAvatar, createdAt),
+            // Post header with author info
+            _buildPostHeader(),
 
-            // Post Content
-            if (content.isNotEmpty) _buildPostContent(context, content),
+            // Post content
+            _buildPostContent(),
 
-            // Post Image
-            if (imageUrl.isNotEmpty) _buildPostImage(context, imageUrl),
+            // Post image (if exists)
+            if (widget.post['imageUrl'] != null &&
+                widget.post['imageUrl'].toString().isNotEmpty)
+              _buildPostImage(),
 
-            // Post Actions
-            if (showActions) _buildPostActions(context, likesCount, commentsCount, isLiked),
+            // Location and tags
+            _buildLocationAndTags(),
+
+            // Interaction stats
+            _buildInteractionStats(),
+
+            // Action buttons
+            _buildActionButtons(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPostHeader(BuildContext context, String authorName, String authorAvatar, DateTime? createdAt) {
+  Widget _buildPostHeader() {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          GestureDetector(
-            onTap: onAuthorTap,
-            child: CircleAvatar(
-              radius: 22,
-              backgroundColor: AppColors.primaryGreen.withOpacity(0.2),
-              backgroundImage: authorAvatar.isNotEmpty
-                  ? CachedNetworkImageProvider(authorAvatar)
-                  : null,
-              child: authorAvatar.isEmpty
-                  ? Text(
-                authorName.isNotEmpty ? authorName[0].toUpperCase() : 'U',
-                style: const TextStyle(
-                  color: AppColors.primaryGreen,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              )
-                  : null,
-            ),
+          // Author avatar
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.2),
+            backgroundImage: widget.post['authorAvatar']?.toString().isNotEmpty == true
+                ? CachedNetworkImageProvider(widget.post['authorAvatar'])
+                : null,
+            child: widget.post['authorAvatar']?.toString().isEmpty != false
+                ? Text(
+              widget.post['authorName']?.toString().isNotEmpty == true
+                  ? widget.post['authorName'].toString()[0].toUpperCase()
+                  : 'U',
+              style: const TextStyle(
+                color: AppColors.primaryGreen,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            )
+                : null,
           ),
           const SizedBox(width: 12),
+
+          // Author info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                GestureDetector(
-                  onTap: onAuthorTap,
-                  child: Text(
-                    authorName,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
+                Text(
+                  widget.post['authorName']?.toString() ?? 'Unknown User',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: AppColors.textPrimary,
                   ),
                 ),
-                if (createdAt != null)
-                  Text(
-                    timeago.format(createdAt),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.grey.shade600,
-                    ),
+                const SizedBox(height: 2),
+                Text(
+                  timeago.format(widget.post['createdAt'] ?? DateTime.now()),
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 13,
                   ),
+                ),
               ],
             ),
           ),
+
+          // Post menu
           PopupMenuButton<String>(
+            onSelected: _handleMenuAction,
             icon: Icon(
               Icons.more_horiz,
               color: Colors.grey.shade600,
             ),
-            onSelected: (value) => _handlePostMenuAction(context, value),
             itemBuilder: (context) => [
               const PopupMenuItem(
                 value: 'save',
@@ -144,7 +181,7 @@ class PostCard extends StatelessWidget {
                   children: [
                     Icon(Icons.share, size: 20),
                     SizedBox(width: 8),
-                    Text('Share'),
+                    Text('Share Post'),
                   ],
                 ),
               ),
@@ -154,7 +191,7 @@ class PostCard extends StatelessWidget {
                   children: [
                     Icon(Icons.report, size: 20, color: Colors.red),
                     SizedBox(width: 8),
-                    Text('Report', style: TextStyle(color: Colors.red)),
+                    Text('Report Post', style: TextStyle(color: Colors.red)),
                   ],
                 ),
               ),
@@ -165,93 +202,229 @@ class PostCard extends StatelessWidget {
     );
   }
 
-  Widget _buildPostContent(BuildContext context, String content) {
+  Widget _buildPostContent() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Text(
-        content,
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          height: 1.5,
-          color: AppColors.textPrimary,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Post text content
+          Text(
+            widget.post['content']?.toString() ?? '',
+            style: const TextStyle(
+              fontSize: 16,
+              height: 1.4,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPostImage() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: CachedNetworkImage(
+          imageUrl: widget.post['imageUrl'],
+          width: double.infinity,
+          height: 250,
+          fit: BoxFit.cover,
+          placeholder: (context, url) => Container(
+            height: 250,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryGreen),
+              ),
+            ),
+          ),
+          errorWidget: (context, url, error) => Container(
+            height: 250,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Center(
+              child: Icon(Icons.error, color: Colors.grey),
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildPostImage(BuildContext context, String imageUrl) {
+  Widget _buildLocationAndTags() {
+    final hasLocation = widget.post['location']?.toString().isNotEmpty == true;
+    final hasTags = widget.post['tags'] != null &&
+        (widget.post['tags'] as List).isNotEmpty;
+
+    if (!hasLocation && !hasTags) return const SizedBox.shrink();
+
     return Padding(
-      padding: const EdgeInsets.all(16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: CachedNetworkImage(
-          imageUrl: imageUrl,
-          width: double.infinity,
-          fit: BoxFit.cover,
-          placeholder: (context, url) => Container(
-            height: 300,
-            color: Colors.grey.shade200,
-            child: const Center(
-              child: CircularProgressIndicator(),
-            ),
-          ),
-          errorWidget: (context, url, error) => Container(
-            height: 300,
-            color: Colors.grey.shade200,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Location
+          if (hasLocation) ...[
+            Row(
               children: [
                 Icon(
-                  Icons.broken_image,
-                  size: 48,
-                  color: Colors.grey.shade500,
+                  Icons.location_on,
+                  color: AppColors.primaryGreen,
+                  size: 16,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(width: 4),
                 Text(
-                  'Failed to load image',
-                  style: TextStyle(
-                    color: Colors.grey.shade500,
-                    fontSize: 12,
+                  widget.post['location'].toString(),
+                  style: const TextStyle(
+                    color: AppColors.primaryGreen,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
             ),
-          ),
-        ),
+            if (hasTags) const SizedBox(height: 8),
+          ],
+
+          // Tags
+          if (hasTags) ...[
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: (widget.post['tags'] as List).map<Widget>((tag) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGreen.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '#$tag',
+                    style: const TextStyle(
+                      color: AppColors.primaryGreen,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
       ),
     );
   }
 
-  Widget _buildPostActions(BuildContext context, int likesCount, int commentsCount, bool isLiked) {
+  Widget _buildInteractionStats() {
+    final likesCount = widget.post['likesCount'] as int? ?? 0;
+    final commentsCount = widget.post['commentsCount'] as int? ?? 0;
+
+    if (likesCount == 0 && commentsCount == 0) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          if (likesCount > 0) ...[
+            Row(
+              children: [
+                Icon(
+                  Icons.favorite,
+                  color: AppColors.error,
+                  size: 16,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _formatCount(likesCount),
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (likesCount > 0 && commentsCount > 0) ...[
+            const SizedBox(width: 16),
+          ],
+          if (commentsCount > 0) ...[
+            Row(
+              children: [
+                Icon(
+                  Icons.comment,
+                  color: AppColors.info,
+                  size: 16,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _formatCount(commentsCount),
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         border: Border(
           top: BorderSide(
             color: Colors.grey.shade200,
-            width: 0.5,
+            width: 1,
           ),
         ),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
+          // Like button
           _buildActionButton(
-            icon: isLiked ? Icons.favorite : Icons.favorite_border,
-            label: _formatCount(likesCount),
-            color: isLiked ? Colors.red : Colors.grey.shade600,
-            onTap: onLike,
+            icon: _isLiked ? Icons.favorite : Icons.favorite_border,
+            label: 'Like',
+            color: _isLiked ? AppColors.error : Colors.grey.shade600,
+            onTap: () {
+              setState(() {
+                _isLiked = !_isLiked;
+              });
+              _animateButton();
+              widget.onLike?.call();
+            },
+            isAnimated: true,
           ),
+
+          // Comment button
           _buildActionButton(
             icon: Icons.comment_outlined,
-            label: _formatCount(commentsCount),
+            label: 'Comment',
             color: Colors.grey.shade600,
-            onTap: onComment,
+            onTap: widget.onComment,
           ),
+
+          // Share button
           _buildActionButton(
             icon: Icons.share_outlined,
             label: 'Share',
             color: Colors.grey.shade600,
-            onTap: onShare,
+            onTap: widget.onShare,
           ),
         ],
       ),
@@ -262,33 +435,48 @@ class PostCard extends StatelessWidget {
     required IconData icon,
     required String label,
     required Color color,
-    required VoidCallback? onTap,
+    VoidCallback? onTap,
+    bool isAnimated = false,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
+    Widget button = Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
                 color: color,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
+                size: 20,
               ),
-            ),
-          ],
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
+
+    if (isAnimated) {
+      return AnimatedBuilder(
+        animation: _scaleAnimation,
+        builder: (context, child) => Transform.scale(
+          scale: _scaleAnimation.value,
+          child: button,
+        ),
+      );
+    }
+
+    return button;
   }
 
   String _formatCount(int count) {
@@ -301,356 +489,23 @@ class PostCard extends StatelessWidget {
     }
   }
 
-  void _handlePostMenuAction(BuildContext context, String action) {
+  void _handleMenuAction(String action) {
     switch (action) {
       case 'save':
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Post saved!'),
-            backgroundColor: AppColors.success,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        widget.onSave?.call();
         break;
       case 'share':
-        if (onShare != null) {
-          onShare!();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Share functionality coming soon!'),
-              backgroundColor: AppColors.info,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
+        widget.onShare?.call();
         break;
       case 'report':
-        _showReportDialog(context);
+        widget.onReport?.call();
         break;
     }
   }
 
-  void _showReportDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Report Post'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Why are you reporting this post?'),
-            const SizedBox(height: 16),
-            ...['Spam', 'Inappropriate content', 'False information', 'Harassment', 'Other'].map(
-                  (reason) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(reason),
-                leading: Radio<String>(
-                  value: reason,
-                  groupValue: null,
-                  onChanged: (value) {
-                    Navigator.pop(context);
-                    _reportPost(context, value ?? reason);
-                  },
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _reportPost(BuildContext context, String reason) {
-    // TODO: Implement actual report functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Post reported for: $reason. Thank you for your feedback.'),
-        backgroundColor: AppColors.success,
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-}
-
-// Compact version of PostCard for lists
-class CompactPostCard extends StatelessWidget {
-  final Map<String, dynamic> post;
-  final VoidCallback? onTap;
-
-  const CompactPostCard({
-    super.key,
-    required this.post,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final content = post['content'] as String? ?? '';
-    final authorName = post['authorName'] as String? ?? 'Unknown User';
-    final authorAvatar = post['authorAvatar'] as String? ?? '';
-    final likesCount = post['likesCount'] as int? ?? 0;
-    final commentsCount = post['commentsCount'] as int? ?? 0;
-    final createdAt = post['createdAt'] as DateTime?;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        margin: const EdgeInsets.only(bottom: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.shadow.withOpacity(0.5),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: AppColors.primaryGreen.withOpacity(0.2),
-              backgroundImage: authorAvatar.isNotEmpty
-                  ? CachedNetworkImageProvider(authorAvatar)
-                  : null,
-              child: authorAvatar.isEmpty
-                  ? Text(
-                authorName.isNotEmpty ? authorName[0].toUpperCase() : 'U',
-                style: const TextStyle(
-                  color: AppColors.primaryGreen,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              )
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    authorName,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    content.length > 100 ? '${content.substring(0, 100)}...' : content,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.favorite,
-                        size: 14,
-                        color: Colors.grey.shade500,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        likesCount.toString(),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Icon(
-                        Icons.comment,
-                        size: 14,
-                        color: Colors.grey.shade500,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        commentsCount.toString(),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                      const Spacer(),
-                      if (createdAt != null)
-                        Text(
-                          timeago.format(createdAt),
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Shimmer loading version of PostCard
-class PostCardShimmer extends StatefulWidget {
-  const PostCardShimmer({super.key});
-
-  @override
-  State<PostCardShimmer> createState() => _PostCardShimmerState();
-}
-
-class _PostCardShimmerState extends State<PostCardShimmer>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    );
-    _animation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.linear,
-    ));
-    _controller.repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header shimmer
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                _buildShimmerBox(44, 44, BorderRadius.circular(22)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildShimmerBox(120, 16, BorderRadius.circular(4)),
-                      const SizedBox(height: 4),
-                      _buildShimmerBox(80, 12, BorderRadius.circular(4)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Content shimmer
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildShimmerBox(double.infinity, 16, BorderRadius.circular(4)),
-                const SizedBox(height: 8),
-                _buildShimmerBox(MediaQuery.of(context).size.width * 0.7, 16, BorderRadius.circular(4)),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Image shimmer
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _buildShimmerBox(double.infinity, 200, BorderRadius.circular(12)),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Actions shimmer
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(
-                  color: Colors.grey.shade200,
-                  width: 0.5,
-                ),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildShimmerBox(60, 32, BorderRadius.circular(16)),
-                _buildShimmerBox(70, 32, BorderRadius.circular(16)),
-                _buildShimmerBox(65, 32, BorderRadius.circular(16)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildShimmerBox(double width, double height, BorderRadius borderRadius) {
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-            borderRadius: borderRadius,
-            gradient: LinearGradient(
-              begin: Alignment(-1.0 - _animation.value, 0.0),
-              end: Alignment(1.0 - _animation.value, 0.0),
-              colors: [
-                Colors.grey.shade300,
-                Colors.grey.shade100,
-                Colors.grey.shade300,
-              ],
-            ),
-          ),
-        );
-      },
-    );
+  void _animateButton() {
+    _animationController.forward().then((_) {
+      _animationController.reverse();
+    });
   }
 }

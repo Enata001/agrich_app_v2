@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/auth/presentation/new_password_screen.dart';
+import '../../features/auth/presentation/phone_sign_in_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/auth/presentation/auth_screen.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
@@ -188,6 +190,33 @@ class AppRouter {
             child: ChatScreen(
               chatId: extra['chatId'] as String? ?? '',
               recipientName: extra['recipientName'] as String? ?? '',
+            ),
+            transitionsBuilder: RouteTransitions.slideTransition,
+          );
+        },
+      ),
+
+
+      GoRoute(
+        path: AppRoutes.phoneSignIn,
+        name: 'phone-signin',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const PhoneSignInScreen(),
+          transitionsBuilder: RouteTransitions.slideTransition,
+        ),
+      ),
+
+      GoRoute(
+        path: AppRoutes.newPassword,
+        name: 'new-password',
+        pageBuilder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return CustomTransitionPage(
+            key: state.pageKey,
+            child: NewPasswordScreen(
+              phoneNumber: extra['phoneNumber'] as String,
+              verificationId: extra['verificationId'] as String?,
             ),
             transitionsBuilder: RouteTransitions.slideTransition,
           );

@@ -3,7 +3,7 @@ class AppConfig {
   static const String appVersion = '2.0.0';
 
   // API Configuration
-  static const String weatherApiKey = 'YOUR_WEATHER_API_KEY';
+  static const String weatherApiKey = 'fe8142801b398835cd1edf8ef9bf5f98';
   static const String weatherBaseUrl = 'https://api.openweathermap.org/data/2.5';
 
   // Firebase Collections
