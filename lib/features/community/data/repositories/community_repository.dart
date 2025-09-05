@@ -9,25 +9,119 @@ class CommunityRepository {
 
   CommunityRepository(this._firebaseService);
 
-  // Get all posts
-  Future<List<Map<String, dynamic>>> getPosts() async {
+  Stream<List<Map<String, dynamic>>> getPosts() {
     try {
-      final snapshot = await _firebaseService.getPosts();
-      return snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        return {
-          'id': doc.id,
-          ...data,
-          'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-          'updatedAt': (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-        };
-      }).toList();
+      return _firebaseService.listenToCollection(
+        AppConfig.postsCollection,
+        orderBy: 'createdAt',
+        descending: true,
+        limit: 50,
+      ).map((snapshot) {
+        return snapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return {
+            'id': doc.id,
+            ...data,
+            'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+            'updatedAt': (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          };
+        }).toList();
+      });
     } catch (e) {
-      return _getMockPosts(); // Fallback to mock data
+      return Stream.value(_getMockPosts());
     }
   }
 
-  // Get post details
+  Stream<List<Map<String, dynamic>>> getFilteredPosts(String filter) {
+    try {
+      Map<String, dynamic>? whereClause;
+      String orderBy = 'createdAt';
+
+      switch (filter.toLowerCase()) {
+        case 'popular':
+          orderBy = 'likesCount';
+          break;
+        case 'trending':
+
+          final weekAgo = DateTime.now().subtract(const Duration(days: 7));
+          whereClause = {'createdAt': weekAgo};
+          break;
+        case 'recent':
+        default:
+          orderBy = 'createdAt';
+          break;
+      }
+
+      return _firebaseService.listenToCollection(
+        AppConfig.postsCollection,
+        where: whereClause,
+        orderBy: orderBy,
+        descending: true,
+        limit: 50,
+      ).map((snapshot) {
+        return snapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return {
+            'id': doc.id,
+            ...data,
+            'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+            'updatedAt': (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          };
+        }).toList();
+      });
+    } catch (e) {
+      return Stream.value([]);
+    }
+  }
+
+  Future<String> createPost({
+    required String content,
+    required String authorId,
+    required String authorName,
+    required String authorAvatar,
+    File? imageFile,
+    String? location,
+    List<String>? tags,
+  }) async {
+    try {
+      String? imageUrl;
+
+
+      if (imageFile != null) {
+        imageUrl = await _firebaseService.uploadPostImage(
+          imageFile.path,
+          'temp_${DateTime.now().millisecondsSinceEpoch}',
+        );
+      }
+
+
+      final postData = {
+        'content': content,
+        'authorId': authorId,
+        'authorAvatar': authorAvatar,
+        'authorName': authorName,
+        'imageUrl': imageUrl ?? '',
+        'location': location ?? '',
+        'tags': tags ?? <String>[],
+        'likesCount': 0,
+        'commentsCount': 0,
+        'likedBy': <String>[],
+        'isArchived': false,
+        'isPinned': false,
+
+        'sharesCount': 0,
+        'isActive': true,
+      };
+
+
+
+      final docRef = await _firebaseService.createPost(postData);
+      return docRef.id;
+    } catch (e) {
+      throw Exception('Failed to create post: $e');
+    }
+  }
+
   Future<Map<String, dynamic>?> getPostDetails(String postId) async {
     try {
       final doc = await _firebaseService.getPost(postId);
@@ -46,451 +140,236 @@ class CommunityRepository {
     }
   }
 
-  // IMPLEMENTED: Create new post
-  Future<String> createPost({
-    required String content,
-    required String authorId,
-    required String authorName,
-    required String authorAvatar,
-    File? imageFile,
-    String? location,
-    List<String>? tags,
-  }) async {
+  Stream<List<Map<String, dynamic>>> searchPosts(String query) {
+    if (query.isEmpty) {
+      return Stream.value([]);
+    }
+
     try {
-      String? imageUrl;
 
-      // Upload image if provided
-      if (imageFile != null) {
-        imageUrl = await _firebaseService.uploadPostImage(
-          imageFile.path,
-          'temp_${DateTime.now().millisecondsSinceEpoch}',
-        );
-      }
-
-      // Create post data
-      final postData = {
-        'content': content,
-        'authorId': authorId,
-        'authorName': authorName,
-        'authorAvatar': authorAvatar,
-        'imageUrl': imageUrl ?? '',
-        'location': location ?? '',
-        'tags': tags ?? <String>[],
-        'likesCount': 0,
-        'commentsCount': 0,
-        'likedBy': <String>[],
-        'isArchived': false,
-        'isPinned': false,
-      };
-
-      final docRef = await _firebaseService.createPost(postData);
-      return docRef.id;
+      return Stream.fromFuture(_firebaseService.searchPosts(query)).map((snapshot) {
+        return snapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return {
+            'id': doc.id,
+            ...data,
+            'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+            'updatedAt': (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          };
+        }).toList();
+      });
     } catch (e) {
-      throw Exception('Failed to create post: $e');
+      return Stream.value([]);
     }
   }
 
-  // IMPLEMENTED: Like/Unlike post
   Future<void> likePost(String postId, String userId) async {
     try {
-      await _firebaseService.likePost(postId, userId);
+
+      final postDoc = await _firebaseService.getPost(postId);
+      if (!postDoc.exists) throw Exception('Post not found');
+
+      final data = postDoc.data() as Map<String, dynamic>;
+      final likedBy = List<String>.from(data['likedBy'] ?? []);
+      final currentLikesCount = data['likesCount'] as int? ?? 0;
+
+      if (likedBy.contains(userId)) {
+
+        likedBy.remove(userId);
+        await _firebaseService.updatePost(postId, {
+          'likedBy': likedBy,
+          'likesCount': currentLikesCount - 1,
+        });
+      } else {
+
+        likedBy.add(userId);
+        await _firebaseService.updatePost(postId, {
+          'likedBy': likedBy,
+          'likesCount': currentLikesCount + 1,
+        });
+
+
+        if (data['authorId'] != userId) {
+          await _createNotification(
+            userId: data['authorId'],
+            type: 'like',
+            title: 'New like on your post',
+            message: 'Someone liked your post',
+            data: {'postId': postId},
+          );
+        }
+      }
     } catch (e) {
       throw Exception('Failed to like post: $e');
     }
   }
 
-  // IMPLEMENTED: Get post comments
-  Future<List<Map<String, dynamic>>> getPostComments(String postId) async {
-    try {
-      final snapshot = await _firebaseService.getPostComments(postId);
-      return snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        return {
-          'id': doc.id,
-          ...data,
-          'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-        };
-      }).toList();
-    } catch (e) {
-      return [];
-    }
-  }
-
-  // IMPLEMENTED: Create comment
-  Future<String> createComment({
-    required String postId,
-    required String content,
-    required String authorId,
-    required String authorName,
-    required String authorAvatar,
-    String? parentCommentId, // For replies
-  }) async {
-    try {
-      final commentData = {
-        'postId': postId,
-        'content': content,
-        'authorId': authorId,
-        'authorName': authorName,
-        'authorAvatar': authorAvatar,
-        'parentCommentId': parentCommentId,
-        'likesCount': 0,
-        'likedBy': <String>[],
-        'isEdited': false,
-      };
-
-      final docRef = await _firebaseService.createComment(commentData);
-
-      // Update post comment count
-      await _updatePostCommentCount(postId);
-
-      return docRef.id;
-    } catch (e) {
-      throw Exception('Failed to create comment: $e');
-    }
-  }
-
-  // IMPLEMENTED: Like comment
-  Future<void> likeComment(String commentId, String userId) async {
-    try {
-      final commentRef = FirebaseFirestore.instance
-          .collection(AppConfig.commentsCollection)
-          .doc(commentId);
-
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        final commentDoc = await transaction.get(commentRef);
-
-        if (commentDoc.exists) {
-          final data = commentDoc.data() as Map<String, dynamic>;
-          final likedBy = List<String>.from(data['likedBy'] ?? []);
-          final likesCount = data['likesCount'] as int? ?? 0;
-
-          if (likedBy.contains(userId)) {
-            likedBy.remove(userId);
-            transaction.update(commentRef, {
-              'likedBy': likedBy,
-              'likesCount': likesCount - 1,
-            });
-          } else {
-            likedBy.add(userId);
-            transaction.update(commentRef, {
-              'likedBy': likedBy,
-              'likesCount': likesCount + 1,
-            });
-          }
-        }
-      });
-    } catch (e) {
-      throw Exception('Failed to like comment: $e');
-    }
-  }
-
-  // IMPLEMENTED: Share post
-  Future<String> sharePost(String postId) async {
-    try {
-      final postDoc = await _firebaseService.getPost(postId);
-      if (!postDoc.exists) {
-        throw Exception('Post not found');
-      }
-
-      final postData = postDoc.data() as Map<String, dynamic>;
-      final postUrl = 'https://agrich.app/posts/$postId';
-
-      return 'Check out this post on Agrich: "${postData['content']}" - $postUrl';
-    } catch (e) {
-      throw Exception('Failed to share post: $e');
-    }
-  }
-
-  // IMPLEMENTED: Save post
   Future<void> savePost(String postId, String userId) async {
     try {
-      await FirebaseFirestore.instance
-          .collection('saved_posts')
-          .doc('${userId}_$postId')
-          .set({
-        'userId': userId,
-        'postId': postId,
-        'savedAt': FieldValue.serverTimestamp(),
-      });
+      final savedPosts = await _firebaseService.getSavedPosts(userId);
+      final alreadySaved = savedPosts.docs.any((doc) =>
+      (doc.data() as Map<String, dynamic>)['postId'] == postId);
+
+      if (alreadySaved) {
+
+        final savedPostDoc = savedPosts.docs.firstWhere((doc) =>
+        (doc.data() as Map<String, dynamic>)['postId'] == postId);
+        await _firebaseService.unsavePost(savedPostDoc.id);
+      } else {
+
+        await _firebaseService.savePost(userId, postId);
+      }
     } catch (e) {
       throw Exception('Failed to save post: $e');
     }
   }
 
-  // IMPLEMENTED: Unsave post
-  Future<void> unsavePost(String postId, String userId) async {
+  Stream<List<Map<String, dynamic>>> getUserPosts(String userId) {
     try {
-      await FirebaseFirestore.instance
-          .collection('saved_posts')
-          .doc('${userId}_$postId')
-          .delete();
+      return _firebaseService.listenToCollection(
+        AppConfig.postsCollection,
+        where: {'authorId': userId, 'isActive': true},
+        orderBy: 'createdAt',
+        descending: true,
+      ).map((snapshot) {
+        return snapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return {
+            'id': doc.id,
+            ...data,
+            'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+            'updatedAt': (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          };
+        }).toList();
+      });
     } catch (e) {
-      throw Exception('Failed to unsave post: $e');
+      return Stream.value([]);
     }
   }
 
-  // IMPLEMENTED: Check if post is saved
-  Future<bool> isPostSaved(String postId, String userId) async {
+  Stream<List<Map<String, dynamic>>> getUserSavedPosts(String userId) {
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('saved_posts')
-          .doc('${userId}_$postId')
-          .get();
-      return doc.exists;
-    } catch (e) {
-      return false;
-    }
-  }
+      return _firebaseService.listenToCollection(
+        'saved_posts',
+        where: {'userId': userId},
+        orderBy: 'createdAt',
+        descending: true,
+      ).asyncMap((snapshot) async {
+        final savedPosts = <Map<String, dynamic>>[];
 
-  // IMPLEMENTED: Get saved posts
-  Future<List<Map<String, dynamic>>> getSavedPosts(String userId) async {
-    try {
-      final savedSnapshot = await FirebaseFirestore.instance
-          .collection('saved_posts')
-          .where('userId', isEqualTo: userId)
-          .orderBy('savedAt', descending: true)
-          .get();
+        for (final doc in snapshot.docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final postId = data['postId'] as String;
 
-      final List<Map<String, dynamic>> savedPosts = [];
+          try {
+            final postDoc = await _firebaseService.getPost(postId);
+            if (postDoc.exists) {
+              final postData = postDoc.data() as Map<String, dynamic>;
+              if (postData['isActive'] == true) {
+                savedPosts.add({
+                  'id': postDoc.id,
+                  'savedAt': (data['createdAt'] as Timestamp?)?.toDate(),
+                  ...postData,
+                  'createdAt': (postData['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+                  'updatedAt': (postData['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+                });
+              }
+            }
+          } catch (e) {
 
-      for (final savedDoc in savedSnapshot.docs) {
-        final savedData = savedDoc.data();
-        final postId = savedData['postId'] as String;
-
-        try {
-          final postDoc = await _firebaseService.getPost(postId);
-          if (postDoc.exists) {
-            final postData = postDoc.data() as Map<String, dynamic>;
-            savedPosts.add({
-              'id': postDoc.id,
-              ...postData,
-              'savedAt': (savedData['savedAt'] as Timestamp?)?.toDate(),
-              'createdAt': (postData['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-            });
           }
-        } catch (e) {
-          // Skip posts that can't be loaded
+        }
+
+        return savedPosts;
+      });
+    } catch (e) {
+      return Stream.value([]);
+    }
+  }
+
+  Future<void> addComment(String postId, String content, String userId, Map<String, dynamic> userData) async {
+    try {
+
+      final commentData = {
+        'postId': postId,
+        'authorId': userId,
+        'authorName': userData['username'] ?? 'User',
+        'authorAvatar': userData['profilePictureUrl'] ?? '',
+        'content': content,
+      };
+
+      await _firebaseService.addComment(commentData);
+
+
+      final postDoc = await _firebaseService.getPost(postId);
+      if (postDoc.exists) {
+        final postData = postDoc.data() as Map<String, dynamic>;
+        final currentCount = postData['commentsCount'] as int? ?? 0;
+
+        await _firebaseService.updatePost(postId, {
+          'commentsCount': currentCount + 1,
+        });
+
+
+        if (postData['authorId'] != userId) {
+          await _createNotification(
+            userId: postData['authorId'],
+            type: 'comment',
+            title: 'New comment on your post',
+            message: 'Someone commented on your post',
+            data: {'postId': postId},
+          );
         }
       }
-
-      return savedPosts;
     } catch (e) {
-      return [];
+      throw Exception('Failed to add comment: $e');
     }
   }
 
-  // IMPLEMENTED: Report post
-  Future<void> reportPost({
-    required String postId,
-    required String reporterId,
-    required String reason,
-    String? description,
+  Stream<List<Map<String, dynamic>>> getPostComments(String postId) {
+    try {
+      return _firebaseService.listenToCollection(
+        AppConfig.commentsCollection,
+        where: {'postId': postId},
+        orderBy: 'createdAt',
+        descending: false,
+      ).map((snapshot) {
+        return snapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return {
+            'id': doc.id,
+            ...data,
+            'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+            'updatedAt': (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          };
+        }).toList();
+      });
+    } catch (e) {
+      return Stream.value([]);
+    }
+  }
+
+  Future<void> _createNotification({
+    required String userId,
+    required String type,
+    required String title,
+    required String message,
+    Map<String, dynamic>? data,
   }) async {
     try {
-      await _firebaseService.reportContent(
-        contentType: 'post',
-        contentId: postId,
-        reporterId: reporterId,
-        reason: reason,
-        additionalData: {
-          'description': description ?? '',
-          'reportedAt': DateTime.now().toIso8601String(),
-        },
-      );
-    } catch (e) {
-      throw Exception('Failed to report post: $e');
-    }
-  }
-
-  // IMPLEMENTED: Report comment
-  Future<void> reportComment({
-    required String commentId,
-    required String reporterId,
-    required String reason,
-    String? description,
-  }) async {
-    try {
-      await _firebaseService.reportContent(
-        contentType: 'comment',
-        contentId: commentId,
-        reporterId: reporterId,
-        reason: reason,
-        additionalData: {
-          'description': description ?? '',
-          'reportedAt': DateTime.now().toIso8601String(),
-        },
-      );
-    } catch (e) {
-      throw Exception('Failed to report comment: $e');
-    }
-  }
-
-  // IMPLEMENTED: Location picker functionality
-  Future<Map<String, dynamic>?> getCurrentLocation() async {
-    try {
-      // This would integrate with location services
-      // For now, return a mock location
-      return {
-        'latitude': 5.6037, // Accra coordinates
-        'longitude': -0.1870,
-        'address': 'Accra, Ghana',
-        'name': 'Current Location',
-      };
-    } catch (e) {
-      return null;
-    }
-  }
-
-  // IMPLEMENTED: Search posts
-  Future<List<Map<String, dynamic>>> searchPosts(String query) async {
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection(AppConfig.postsCollection)
-          .where('content', isGreaterThanOrEqualTo: query.toLowerCase())
-          .where('content', isLessThanOrEqualTo: '${query.toLowerCase()}\uf8ff')
-          .orderBy('content')
-          .orderBy('createdAt', descending: true)
-          .limit(20)
-          .get();
-
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return {
-          'id': doc.id,
-          ...data,
-          'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-        };
-      }).toList();
-    } catch (e) {
-      return [];
-    }
-  }
-
-  // IMPLEMENTED: Get posts by tag
-  Future<List<Map<String, dynamic>>> getPostsByTag(String tag) async {
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection(AppConfig.postsCollection)
-          .where('tags', arrayContains: tag)
-          .orderBy('createdAt', descending: true)
-          .limit(20)
-          .get();
-
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return {
-          'id': doc.id,
-          ...data,
-          'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-        };
-      }).toList();
-    } catch (e) {
-      return [];
-    }
-  }
-
-  // IMPLEMENTED: Get user's posts
-  Future<List<Map<String, dynamic>>> getUserPosts(String userId) async {
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection(AppConfig.postsCollection)
-          .where('authorId', isEqualTo: userId)
-          .orderBy('createdAt', descending: true)
-          .get();
-
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return {
-          'id': doc.id,
-          ...data,
-          'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-        };
-      }).toList();
-    } catch (e) {
-      return [];
-    }
-  }
-
-  // IMPLEMENTED: Delete post
-  Future<void> deletePost(String postId, String userId) async {
-    try {
-      // Verify ownership
-      final postDoc = await _firebaseService.getPost(postId);
-      if (!postDoc.exists) {
-        throw Exception('Post not found');
-      }
-
-      final postData = postDoc.data() as Map<String, dynamic>;
-      if (postData['authorId'] != userId) {
-        throw Exception('Not authorized to delete this post');
-      }
-
-      // Delete post image if exists
-      if (postData['imageUrl'] != null && postData['imageUrl'].isNotEmpty) {
-        await _firebaseService.deleteFile(postData['imageUrl']);
-      }
-
-      // Delete all comments for this post
-      final commentsSnapshot = await _firebaseService.getPostComments(postId);
-      for (final commentDoc in commentsSnapshot.docs) {
-        await _firebaseService.deleteComment(commentDoc.id);
-      }
-
-      // Delete the post
-      await _firebaseService.deletePost(postId);
-
-      // Clean up saved post references
-      final savedPostsSnapshot = await FirebaseFirestore.instance
-          .collection('saved_posts')
-          .where('postId', isEqualTo: postId)
-          .get();
-
-      for (final savedDoc in savedPostsSnapshot.docs) {
-        await savedDoc.reference.delete();
-      }
-    } catch (e) {
-      throw Exception('Failed to delete post: $e');
-    }
-  }
-
-  // IMPLEMENTED: Update comment count
-  Future<void> _updatePostCommentCount(String postId) async {
-    try {
-      final commentsSnapshot = await _firebaseService.getPostComments(postId);
-      final commentCount = commentsSnapshot.docs.length;
-
-      await _firebaseService.updatePost(postId, {
-        'commentsCount': commentCount,
+      await _firebaseService.createNotification(userId, {
+        'type': type,
+        'title': title,
+        'message': message,
+        'data': data ?? {},
+        'isRead': false,
       });
     } catch (e) {
-      // Ignore errors in comment count update
+
+      print('Failed to create notification: $e');
     }
   }
 
-  // Admin functions
-  Future<void> pinPost(String postId, bool isPinned) async {
-    try {
-      await _firebaseService.updatePost(postId, {
-        'isPinned': isPinned,
-        'pinnedAt': isPinned ? DateTime.now() : null,
-      });
-    } catch (e) {
-      throw Exception('Failed to pin/unpin post: $e');
-    }
-  }
-
-  Future<void> archivePost(String postId, bool isArchived) async {
-    try {
-      await _firebaseService.updatePost(postId, {
-        'isArchived': isArchived,
-        'archivedAt': isArchived ? DateTime.now() : null,
-      });
-    } catch (e) {
-      throw Exception('Failed to archive/unarchive post: $e');
-    }
-  }
-
-  // Helper method to get mock posts for testing
   List<Map<String, dynamic>> _getMockPosts() {
     return [
       {
@@ -534,4 +413,315 @@ class CommunityRepository {
       },
     ];
   }
+
+  Future<String> createComment({
+    required String postId,
+    required String content,
+    required String authorId,
+    required String authorName,
+    required String authorAvatar,
+    String? parentCommentId,
+  }) async {
+    try {
+      final commentData = {
+        'postId': postId,
+        'content': content,
+        'authorId': authorId,
+        'authorName': authorName,
+        'authorAvatar': authorAvatar,
+        'parentCommentId': parentCommentId,
+        'likesCount': 0,
+        'likedBy': <String>[],
+        'isEdited': false,
+      };
+
+      final docRef = await _firebaseService.createComment(commentData);
+
+
+      await _updatePostCommentCount(postId);
+
+      return docRef.id;
+    } catch (e) {
+      throw Exception('Failed to create comment: $e');
+    }
+  }
+
+
+  Future<void> likeComment(String commentId, String userId) async {
+    try {
+      final commentRef = FirebaseFirestore.instance
+          .collection(AppConfig.commentsCollection)
+          .doc(commentId);
+
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final commentDoc = await transaction.get(commentRef);
+
+        if (commentDoc.exists) {
+          final data = commentDoc.data() as Map<String, dynamic>;
+          final likedBy = List<String>.from(data['likedBy'] ?? []);
+          final likesCount = data['likesCount'] as int? ?? 0;
+
+          if (likedBy.contains(userId)) {
+            likedBy.remove(userId);
+            transaction.update(commentRef, {
+              'likedBy': likedBy,
+              'likesCount': likesCount - 1,
+            });
+          } else {
+            likedBy.add(userId);
+            transaction.update(commentRef, {
+              'likedBy': likedBy,
+              'likesCount': likesCount + 1,
+            });
+          }
+        }
+      });
+    } catch (e) {
+      throw Exception('Failed to like comment: $e');
+    }
+  }
+
+
+  Future<String> sharePost(String postId) async {
+    try {
+      final postDoc = await _firebaseService.getPost(postId);
+      if (!postDoc.exists) {
+        throw Exception('Post not found');
+      }
+
+      final postData = postDoc.data() as Map<String, dynamic>;
+      final postUrl = 'https://agrich.app/posts/$postId';
+
+      return 'Check out this post on Agrich: "${postData['content']}" - $postUrl';
+    } catch (e) {
+      throw Exception('Failed to share post: $e');
+    }
+  }
+
+
+  Future<void> unsavePost(String postId, String userId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('saved_posts')
+          .doc('${userId}_$postId')
+          .delete();
+    } catch (e) {
+      throw Exception('Failed to unsave post: $e');
+    }
+  }
+
+
+  Future<bool> isPostSaved(String postId, String userId) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('saved_posts')
+          .doc('${userId}_$postId')
+          .get();
+      return doc.exists;
+    } catch (e) {
+      return false;
+    }
+  }
+
+
+  Future<List<Map<String, dynamic>>> getSavedPosts(String userId) async {
+    try {
+      final savedSnapshot = await FirebaseFirestore.instance
+          .collection('saved_posts')
+          .where('userId', isEqualTo: userId)
+          .orderBy('savedAt', descending: true)
+          .get();
+
+      final List<Map<String, dynamic>> savedPosts = [];
+
+      for (final savedDoc in savedSnapshot.docs) {
+        final savedData = savedDoc.data();
+        final postId = savedData['postId'] as String;
+
+        try {
+          final postDoc = await _firebaseService.getPost(postId);
+          if (postDoc.exists) {
+            final postData = postDoc.data() as Map<String, dynamic>;
+            savedPosts.add({
+              'id': postDoc.id,
+              ...postData,
+              'savedAt': (savedData['savedAt'] as Timestamp?)?.toDate(),
+              'createdAt': (postData['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+            });
+          }
+        } catch (e) {
+
+        }
+      }
+
+      return savedPosts;
+    } catch (e) {
+      return [];
+    }
+  }
+
+
+  Future<void> reportPost({
+    required String postId,
+    required String reporterId,
+    required String reason,
+    String? description,
+  }) async {
+    try {
+      await _firebaseService.reportContent(
+        contentType: 'post',
+        contentId: postId,
+        reporterId: reporterId,
+        reason: reason,
+        additionalData: {
+          'description': description ?? '',
+          'reportedAt': DateTime.now().toIso8601String(),
+        },
+      );
+    } catch (e) {
+      throw Exception('Failed to report post: $e');
+    }
+  }
+
+
+  Future<void> reportComment({
+    required String commentId,
+    required String reporterId,
+    required String reason,
+    String? description,
+  }) async {
+    try {
+      await _firebaseService.reportContent(
+        contentType: 'comment',
+        contentId: commentId,
+        reporterId: reporterId,
+        reason: reason,
+        additionalData: {
+          'description': description ?? '',
+          'reportedAt': DateTime.now().toIso8601String(),
+        },
+      );
+    } catch (e) {
+      throw Exception('Failed to report comment: $e');
+    }
+  }
+
+
+  Future<Map<String, dynamic>?> getCurrentLocation() async {
+    try {
+
+
+      return {
+        'latitude': 5.6037,
+        'longitude': -0.1870,
+        'address': 'Accra, Ghana',
+        'name': 'Current Location',
+      };
+    } catch (e) {
+      return null;
+    }
+  }
+
+
+  Future<List<Map<String, dynamic>>> getPostsByTag(String tag) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection(AppConfig.postsCollection)
+          .where('tags', arrayContains: tag)
+          .orderBy('createdAt', descending: true)
+          .limit(20)
+          .get();
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          ...data,
+          'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        };
+      }).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+
+  Future<void> deletePost(String postId, String userId) async {
+    try {
+
+      final postDoc = await _firebaseService.getPost(postId);
+      if (!postDoc.exists) {
+        throw Exception('Post not found');
+      }
+
+      final postData = postDoc.data() as Map<String, dynamic>;
+      if (postData['authorId'] != userId) {
+        throw Exception('Not authorized to delete this post');
+      }
+
+
+      if (postData['imageUrl'] != null && postData['imageUrl'].isNotEmpty) {
+        await _firebaseService.deleteFile(postData['imageUrl']);
+      }
+
+
+      final commentsSnapshot = await _firebaseService.getPostComments(postId);
+      for (final commentDoc in commentsSnapshot.docs) {
+        await _firebaseService.deleteComment(commentDoc.id);
+      }
+
+
+      await _firebaseService.deletePost(postId);
+
+
+      final savedPostsSnapshot = await FirebaseFirestore.instance
+          .collection('saved_posts')
+          .where('postId', isEqualTo: postId)
+          .get();
+
+      for (final savedDoc in savedPostsSnapshot.docs) {
+        await savedDoc.reference.delete();
+      }
+    } catch (e) {
+      throw Exception('Failed to delete post: $e');
+    }
+  }
+
+
+  Future<void> _updatePostCommentCount(String postId) async {
+    try {
+      final commentsSnapshot = await _firebaseService.getPostComments(postId);
+      final commentCount = commentsSnapshot.docs.length;
+
+      await _firebaseService.updatePost(postId, {
+        'commentsCount': commentCount,
+      });
+    } catch (e) {
+
+    }
+  }
+
+
+  Future<void> pinPost(String postId, bool isPinned) async {
+    try {
+      await _firebaseService.updatePost(postId, {
+        'isPinned': isPinned,
+        'pinnedAt': isPinned ? DateTime.now() : null,
+      });
+    } catch (e) {
+      throw Exception('Failed to pin/unpin post: $e');
+    }
+  }
+
+  Future<void> archivePost(String postId, bool isArchived) async {
+    try {
+      await _firebaseService.updatePost(postId, {
+        'isArchived': isArchived,
+        'archivedAt': isArchived ? DateTime.now() : null,
+      });
+    } catch (e) {
+      throw Exception('Failed to archive/unarchive post: $e');
+    }
+  }
+
 }

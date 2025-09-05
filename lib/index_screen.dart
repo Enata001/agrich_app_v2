@@ -81,7 +81,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       final currentUser = authRepository.currentUser;
 
       if (isSignedIn && currentUser != null) {
-        // User is signed in - go to main screen
+        final tipsRepository = ref.read(tipsRepositoryProvider);
+        await tipsRepository.initializeDefaultTips();
+
         if (mounted) context.go(AppRoutes.main);
       } else {
         // User not signed in - go to auth screen

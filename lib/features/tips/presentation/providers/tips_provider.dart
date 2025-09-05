@@ -11,7 +11,7 @@ final tipsHistoryProvider = FutureProvider<List<Map<String, dynamic>>>((ref) asy
   return await tipsRepository.getTipsHistory();
 });
 
-final tipsByCategoryProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, category) async {
+final tipsByCategoryProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, category) {
   final tipsRepository = ref.watch(tipsRepositoryProvider);
-  return await tipsRepository.getTipsByCategory(category);
+  return tipsRepository.getTipsByCategory(category);
 });

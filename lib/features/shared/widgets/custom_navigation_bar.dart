@@ -1,38 +1,36 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 
-class NavigationItem {
+class CustomNavigationBarItem {
   final IconData icon;
   final IconData? activeIcon;
   final String label;
-  final Widget page;
 
-  NavigationItem({
+  const CustomNavigationBarItem({
     required this.icon,
     this.activeIcon,
     required this.label,
-    required this.page,
   });
 }
 
 class CustomNavigationBar extends StatefulWidget {
-  final List<NavigationItem> items;
+  final List<CustomNavigationBarItem> items;
   final int currentIndex;
-  final Function(int) onTap;
-  final bool isVisible;
+  final ValueChanged<int> onTap;
   final Color? backgroundColor;
   final Color? selectedItemColor;
   final Color? unselectedItemColor;
+  final bool floating;
 
   const CustomNavigationBar({
     super.key,
     required this.items,
     required this.currentIndex,
     required this.onTap,
-    this.isVisible = true,
     this.backgroundColor,
     this.selectedItemColor,
     this.unselectedItemColor,
+    this.floating = true,
   });
 
   @override
@@ -41,36 +39,42 @@ class CustomNavigationBar extends StatefulWidget {
 
 class _CustomNavigationBarState extends State<CustomNavigationBar>
     with TickerProviderStateMixin {
-  late List<AnimationController> _controllers;
+  late List<AnimationController> _animationControllers;
   late List<Animation<double>> _scaleAnimations;
   late List<Animation<Offset>> _slideAnimations;
 
   @override
   void initState() {
     super.initState();
-    _controllers = List.generate(
+    _initializeAnimations();
+  }
+
+  void _initializeAnimations() {
+    _animationControllers = List.generate(
       widget.items.length,
-          (index) => AnimationController(
-        duration: const Duration(milliseconds: 300),
+      (index) => AnimationController(
+        duration: const Duration(milliseconds: 200),
         vsync: this,
       ),
     );
 
-    _scaleAnimations = _controllers.map((controller) {
-      return Tween<double>(begin: 1.0, end: 1.2).animate(
-        CurvedAnimation(parent: controller, curve: Curves.elasticOut),
-      );
+    _scaleAnimations = _animationControllers.map((controller) {
+      return Tween<double>(
+        begin: 1.0,
+        end: 1.1,
+      ).animate(CurvedAnimation(parent: controller, curve: Curves.elasticOut));
     }).toList();
 
-    _slideAnimations = _controllers.map((controller) {
-      return Tween<Offset>(begin: Offset.zero, end: const Offset(0, -0.1)).animate(
-        CurvedAnimation(parent: controller, curve: Curves.elasticOut),
-      );
+    _slideAnimations = _animationControllers.map((controller) {
+      return Tween<Offset>(
+        begin: Offset.zero,
+        end: const Offset(0, -0.1),
+      ).animate(CurvedAnimation(parent: controller, curve: Curves.elasticOut));
     }).toList();
 
-    // Animate the currently selected item
-    if (widget.currentIndex >= 0 && widget.currentIndex < _controllers.length) {
-      _controllers[widget.currentIndex].forward();
+    // Animate the initially selected item
+    if (widget.currentIndex < _animationControllers.length) {
+      _animationControllers[widget.currentIndex].forward();
     }
   }
 
@@ -78,20 +82,25 @@ class _CustomNavigationBarState extends State<CustomNavigationBar>
   void didUpdateWidget(CustomNavigationBar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.currentIndex != widget.currentIndex) {
-      // Reset previous animation
-      if (oldWidget.currentIndex >= 0 && oldWidget.currentIndex < _controllers.length) {
-        _controllers[oldWidget.currentIndex].reverse();
-      }
-      // Start new animation
-      if (widget.currentIndex >= 0 && widget.currentIndex < _controllers.length) {
-        _controllers[widget.currentIndex].forward();
-      }
+      _animateSelection(widget.currentIndex);
+    }
+  }
+
+  void _animateSelection(int index) {
+    // Reset all animations
+    for (var controller in _animationControllers) {
+      controller.reverse();
+    }
+
+    // Animate selected item
+    if (index < _animationControllers.length) {
+      _animationControllers[index].forward();
     }
   }
 
   @override
   void dispose() {
-    for (final controller in _controllers) {
+    for (var controller in _animationControllers) {
       controller.dispose();
     }
     super.dispose();
@@ -99,15 +108,23 @@ class _CustomNavigationBarState extends State<CustomNavigationBar>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSlide(
+    if (widget.floating) {
+      return _buildFloatingNavigationBar();
+    } else {
+      return _buildStandardNavigationBar();
+    }
+  }
+
+  Widget _buildStandardNavigationBar() {
+    return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      offset: widget.isVisible ? Offset.zero : const Offset(0, 1),
+      transform: Matrix4.translationValues(0, 0, 0),
       curve: Curves.fastOutSlowIn,
       child: Container(
-        margin: const EdgeInsets.all(16),
+        margin: const EdgeInsets.fromLTRB(4, 0, 4,4),
         decoration: BoxDecoration(
           color: widget.backgroundColor ?? Colors.white,
-          borderRadius: BorderRadius.circular(25),
+          borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
               color: AppColors.shadow,
@@ -127,6 +144,41 @@ class _CustomNavigationBarState extends State<CustomNavigationBar>
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: List.generate(widget.items.length, (index) {
               return _buildNavigationItem(index);
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFloatingNavigationBar() {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.fastOutSlowIn,
+      child: Container(
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppColors.primaryGreen,
+              AppColors.darkGreen.withValues(alpha: 0.9),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(25),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryGreen.withValues(alpha: 0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(25),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: List.generate(widget.items.length, (index) {
+              return _buildFloatingItem(index);
             }),
           ),
         ),
@@ -166,8 +218,9 @@ class _CustomNavigationBarState extends State<CustomNavigationBar>
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? (widget.selectedItemColor ?? AppColors.primaryGreen)
-                              .withValues(alpha: 0.1)
+                              ? (widget.selectedItemColor ??
+                                        AppColors.primaryGreen)
+                                    .withValues(alpha: 0.1)
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -176,22 +229,32 @@ class _CustomNavigationBarState extends State<CustomNavigationBar>
                               ? item.activeIcon!
                               : item.icon,
                           color: isSelected
-                              ? widget.selectedItemColor ?? AppColors.primaryGreen
-                              : widget.unselectedItemColor ?? AppColors.textSecondary,
+                              ? widget.selectedItemColor ??
+                                    AppColors.primaryGreen
+                              : widget.unselectedItemColor ??
+                                    Colors.grey.shade600,
                           size: 24,
                         ),
                       ),
                       const SizedBox(height: 4),
                       AnimatedDefaultTextStyle(
-                        duration: const Duration(milliseconds: 300),
+                        duration: const Duration(milliseconds: 200),
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
                           color: isSelected
-                              ? widget.selectedItemColor ?? AppColors.primaryGreen
-                              : widget.unselectedItemColor ?? AppColors.textSecondary,
+                              ? widget.selectedItemColor ??
+                                    AppColors.primaryGreen
+                              : widget.unselectedItemColor ??
+                                    Colors.grey.shade600,
                         ),
-                        child: Text(item.label),
+                        child: Text(
+                          item.label,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
@@ -201,187 +264,6 @@ class _CustomNavigationBarState extends State<CustomNavigationBar>
           ),
         ),
       ),
-    );
-  }
-
-  void _animateSelection(int index) {
-    // Add a bounce effect when tapped
-    _controllers[index].forward().then((_) {
-      _controllers[index].reverse();
-    });
-  }
-}
-
-class CustomPageView extends StatefulWidget {
-  final List<NavigationItem> items;
-  final PageController? controller;
-  final Function(int)? onPageChanged;
-
-  const CustomPageView({
-    super.key,
-    required this.items,
-    this.controller,
-    this.onPageChanged,
-  });
-
-  @override
-  State<CustomPageView> createState() => _CustomPageViewState();
-}
-
-class _CustomPageViewState extends State<CustomPageView>
-    with AutomaticKeepAliveClientMixin {
-  late PageController _pageController;
-
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  void initState() {
-    super.initState();
-    _pageController = widget.controller ?? PageController();
-  }
-
-  @override
-  void dispose() {
-    if (widget.controller == null) {
-      _pageController.dispose();
-    }
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    return PageView.builder(
-      controller: _pageController,
-      onPageChanged: widget.onPageChanged,
-      itemCount: widget.items.length,
-      physics: const NeverScrollableScrollPhysics(), // Disable swipe navigation
-      itemBuilder: (context, index) {
-        return _KeepAlivePage(child: widget.items[index].page);
-      },
-    );
-  }
-}
-
-class _KeepAlivePage extends StatefulWidget {
-  final Widget child;
-
-  const _KeepAlivePage({required this.child});
-
-  @override
-  State<_KeepAlivePage> createState() => _KeepAlivePageState();
-}
-
-class _KeepAlivePageState extends State<_KeepAlivePage>
-    with AutomaticKeepAliveClientMixin {
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    return widget.child;
-  }
-}
-
-class FloatingNavigationBar extends StatefulWidget {
-  final List<NavigationItem> items;
-  final int currentIndex;
-  final Function(int) onTap;
-  final bool isVisible;
-
-  const FloatingNavigationBar({
-    super.key,
-    required this.items,
-    required this.currentIndex,
-    required this.onTap,
-    this.isVisible = true,
-  });
-
-  @override
-  State<FloatingNavigationBar> createState() => _FloatingNavigationBarState();
-}
-
-class _FloatingNavigationBarState extends State<FloatingNavigationBar>
-    with TickerProviderStateMixin {
-  late AnimationController _visibilityController;
-  late Animation<double> _visibilityAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _visibilityController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _visibilityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _visibilityController, curve: Curves.fastOutSlowIn),
-    );
-
-    if (widget.isVisible) {
-      _visibilityController.forward();
-    }
-  }
-
-  @override
-  void didUpdateWidget(FloatingNavigationBar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.isVisible != widget.isVisible) {
-      if (widget.isVisible) {
-        _visibilityController.forward();
-      } else {
-        _visibilityController.reverse();
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _visibilityController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _visibilityAnimation,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, (1 - _visibilityAnimation.value) * 100),
-          child: Opacity(
-            opacity: _visibilityAnimation.value,
-            child: Container(
-              margin: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.primaryGreen.withValues(alpha: 0.9),
-                    AppColors.darkGreen.withValues(alpha: 0.9),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primaryGreen.withValues(alpha: 0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(25),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: List.generate(widget.items.length, (index) {
-                    return _buildFloatingItem(index);
-                  }),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 
@@ -402,11 +284,15 @@ class _FloatingNavigationBarState extends State<FloatingNavigationBar>
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isSelected ? Colors.white.withValues(alpha: 0.2) : Colors.transparent,
+                  color: isSelected
+                      ? Colors.white.withValues(alpha: 0.2)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  isSelected && item.activeIcon != null ? item.activeIcon! : item.icon,
+                  isSelected && item.activeIcon != null
+                      ? item.activeIcon!
+                      : item.icon,
                   color: Colors.white,
                   size: 24,
                 ),
@@ -425,6 +311,78 @@ class _FloatingNavigationBarState extends State<FloatingNavigationBar>
           ),
         ),
       ),
+    );
+  }
+}
+
+// Shimmer effect for loading states
+class ShimmerBox extends StatefulWidget {
+  final double width;
+  final double height;
+  final BorderRadius borderRadius;
+
+  const ShimmerBox({
+    super.key,
+    required this.width,
+    required this.height,
+    this.borderRadius = const BorderRadius.all(Radius.circular(4)),
+  });
+
+  @override
+  State<ShimmerBox> createState() => _ShimmerBoxState();
+}
+
+class _ShimmerBoxState extends State<ShimmerBox>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat();
+
+    _animation = Tween<double>(begin: -1.0, end: 2.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            borderRadius: widget.borderRadius,
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              stops: [
+                _animation.value - 1,
+                _animation.value,
+                _animation.value + 1,
+              ],
+              colors: [
+                Colors.grey.shade300,
+                Colors.grey.shade100,
+                Colors.grey.shade300,
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

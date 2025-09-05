@@ -34,6 +34,14 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+    <string>We need your location to provide services while the app is in use.</string>
+
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>We need your location even when the app is in the background.</string>
+
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>We need your location at all times to improve your experience.</string>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

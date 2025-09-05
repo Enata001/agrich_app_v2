@@ -1,14 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
 
-final userChatsProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, userId) async {
+final userChatsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, userId)  {
   final chatRepository = ref.watch(chatRepositoryProvider);
-  return await chatRepository.getUserChats(userId);
+  return chatRepository.getUserChats(userId);
 });
 
 final chatMessagesProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, chatId) {
   final chatRepository = ref.watch(chatRepositoryProvider);
-  return chatRepository.getChatMessagesStream(chatId);
+  return chatRepository.getMessages(chatId);
 });
 
 final sendMessageProvider = StateNotifierProvider<SendMessageNotifier, SendMessageState>((ref) {

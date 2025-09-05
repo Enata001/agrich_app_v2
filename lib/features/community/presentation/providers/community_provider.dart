@@ -2,9 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
 
 // Community Posts Provider
-final communityPostsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+final communityPostsProvider = StreamProvider<List<Map<String, dynamic>>>((ref)  {
   final communityRepository = ref.watch(communityRepositoryProvider);
-  return await communityRepository.getPosts();
+  return communityRepository.getPosts();
 });
 
 // Post Details Provider
@@ -14,9 +14,9 @@ final postDetailsProvider = FutureProvider.family<Map<String, dynamic>?, String>
 });
 
 // Post Comments Provider
-final postCommentsProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, postId) async {
+final postCommentsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, postId) {
   final communityRepository = ref.watch(communityRepositoryProvider);
-  return await communityRepository.getPostComments(postId);
+  return communityRepository.getPostComments(postId);
 });
 
 // Like Post Provider

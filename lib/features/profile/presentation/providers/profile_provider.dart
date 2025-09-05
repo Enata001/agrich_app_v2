@@ -74,9 +74,9 @@ final savedPostsProvider = FutureProvider.family<List<Map<String, dynamic>>, Str
 });
 
 // User Posts Provider
-final userPostsProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, userId) async {
+final userPostsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, userId)  {
   final communityRepository = ref.watch(communityRepositoryProvider);
-  return await communityRepository.getUserPosts(userId);
+  return  communityRepository.getUserPosts(userId);
 });
 
 // User Stats Provider
@@ -85,12 +85,12 @@ final userStatsProvider = FutureProvider.family<Map<String, dynamic>, String>((r
   final videoRepository = ref.watch(videosRepositoryProvider);
 
   // Get user posts
-  final posts = await communityRepository.getUserPosts(userId);
+  final posts =  communityRepository.getUserPosts(userId);
   final videos = await videoRepository.getAllVideos();
   final savedPosts = await communityRepository.getSavedPosts(userId);
 
-  // Calculate total likes across all posts
-  final totalLikes = posts.fold<int>(0, (sum, post) => sum + (post['likesCount'] as int? ?? 0));
+
+  final totalLikes = posts.fold<int>(0, (sum, post) => (post.map((e) => sum + e['likesCount']) as int? ?? 0));
 
   return {
     'postsCount': posts.length,

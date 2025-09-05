@@ -1,4 +1,5 @@
-import 'package:agrich_app_v2/features/profile/presentation/providers/profile_provider.dart';
+// lib/features/profile/presentation/profile_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,7 +12,6 @@ import '../../auth/providers/auth_provider.dart';
 import '../../shared/widgets/gradient_background.dart';
 import '../../shared/widgets/loading_indicator.dart';
 import '../../shared/widgets/custom_button.dart';
-
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -56,36 +56,131 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   }
 
   Widget _buildAuthenticatedProfile(dynamic user) {
-    final userProfile = ref.watch(currentUserProfileProvider);
-
-    return userProfile.when(
-      data: (profile) => profile != null
-          ? _buildProfileContent(user, profile)
-          : _buildNoProfileState(),
-      loading: () => _buildLoadingState(),
-      error: (error, stack) => _buildErrorState(context, error),
-    );
-  }
-
-  Widget _buildProfileContent(dynamic user, dynamic profile) {
     return GradientBackground(
       child: SafeArea(
         child: Column(
           children: [
-            // Profile Header
-            _buildProfileHeader(user, profile),
-
-            // Tab Bar
-            _buildTabBar(),
-
-            // Tab Content
+            _buildSimplifiedHeader(user),
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: Column(
+                  children: [
+                    _buildCoreStats(),
+                    _buildMinimalActions(),
+                    _buildTabBar(),
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildMyPostsTab(),
+                          _buildMyVideosTab(),
+                          _buildSavedPostsTab(),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSimplifiedHeader(dynamic user) {
+    return FadeInDown(
+      duration: const Duration(milliseconds: 600),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            // Profile Avatar
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white,
+                  width: 3,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: CircleAvatar(
+                radius: 38,
+                backgroundColor: Colors.white,
+                backgroundImage: user.photoURL != null
+                    ? CachedNetworkImageProvider(user.photoURL!)
+                    : null,
+                child: user.photoURL == null
+                    ? Text(
+                  user.displayName?.isNotEmpty == true
+                      ? user.displayName![0].toUpperCase()
+                      : 'U',
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryGreen,
+                  ),
+                )
+                    : null,
+              ),
+            ),
+
+            const SizedBox(width: 20),
+
+            // Profile Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildOverviewTab(user, profile),
-                  _buildMyVideosTab(user.uid),
-                  _buildSavedPostsTab(user.uid),
+                  Text(
+                    user.displayName ?? 'User',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    user.email ?? '',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: user.emailVerified
+                          ? Colors.green.withValues(alpha: 0.2)
+                          : Colors.orange.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      user.emailVerified ? 'Verified' : 'Unverified',
+                      style: TextStyle(
+                        color: user.emailVerified ? Colors.green : Colors.orange,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -95,263 +190,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     );
   }
 
-  Widget _buildProfileHeader(dynamic user, dynamic profile) {
-    return FadeInDown(
-      duration: const Duration(milliseconds: 600),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            // Profile Picture and Info
-            Row(
-              children: [
-                // Profile Picture
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(50),
-                    border: Border.all(color: Colors.white, width: 3),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.white,
-                    backgroundImage: user.photoURL != null
-                        ? CachedNetworkImageProvider(user.photoURL!)
-                        : null,
-                    child: user.photoURL == null
-                        ? Text(
-                      user.displayName?.isNotEmpty == true
-                          ? user.displayName![0].toUpperCase()
-                          : 'U',
-                      style: const TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primaryGreen,
-                      ),
-                    )
-                        : null,
-                  ),
-                ),
-
-                const SizedBox(width: 20),
-
-                // Profile Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user.displayName ?? 'User',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      if (profile.bio?.isNotEmpty == true) ...[
-                        Text(
-                          profile.bio!,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.9),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                      if (profile.location?.isNotEmpty == true) ...[
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.location_on,
-                              color: Colors.white.withValues(alpha: 0.8),
-                              size: 16,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              profile.location!,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.8),
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.calendar_today,
-                            color: Colors.white.withValues(alpha: 0.8),
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Joined ${_formatJoinDate(profile.joinedAt)}',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.8),
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 20),
-
-            // Edit Profile Button
-            SizedBox(
-              width: double.infinity,
-              child: CustomButton(
-                text: 'Edit Profile',
-                onPressed: () => context.push(AppRoutes.editProfile),
-                backgroundColor: Colors.white.withValues(alpha: 0.2),
-                textColor: Colors.white,
-                icon: const Icon(Icons.edit, color: Colors.white),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTabBar() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(25),
-      ),
-      child: TabBar(
-        controller: _tabController,
-        indicator: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(25),
-        ),
-        labelColor: AppColors.primaryGreen,
-        unselectedLabelColor: Colors.white.withValues(alpha: 0.7),
-        labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-        tabs: const [
-          Tab(text: 'Overview'),
-          Tab(text: 'My Videos'),
-          Tab(text: 'Saved Posts'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOverviewTab(dynamic user, dynamic profile) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Stats Section
-          _buildStatsSection(user),
-
-          const SizedBox(height: 30),
-
-          // Quick Actions Section
-          _buildQuickActions(),
-
-          const SizedBox(height: 30),
-
-          // Settings Section
-          _buildSettingsSection(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMyVideosTab(String userId) {
-    final userVideos = ref.watch(userVideosProvider(userId));
-
-    return userVideos.when(
-      data: (videos) => videos.isNotEmpty
-          ? _buildVideosList(videos)
-          : _buildEmptyVideosState(),
-      loading: () => _buildLoadingContent(),
-      error: (error, stack) => _buildErrorContent('Unable to load videos'),
-    );
-  }
-
-  Widget _buildSavedPostsTab(String userId) {
-    final savedPosts = ref.watch(savedPostsProvider(userId));
-
-    return savedPosts.when(
-      data: (posts) => posts.isNotEmpty
-          ? _buildSavedPostsList(posts)
-          : _buildEmptySavedPostsState(),
-      loading: () => _buildLoadingContent(),
-      error: (error, stack) => _buildErrorContent('Unable to load saved posts'),
-    );
-  }
-
-  Widget _buildStatsSection(dynamic user) {
+  Widget _buildCoreStats() {
     return FadeInUp(
       duration: const Duration(milliseconds: 600),
       delay: const Duration(milliseconds: 200),
       child: Container(
         padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            Text(
-              'Your Stats',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
+            _buildStatItem(
+              icon: Icons.article,
+              value: '0', // Replace with real data when available
+              label: 'Posts',
+              color: AppColors.primaryGreen,
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                _buildStatItem(
-                  icon: Icons.post_add,
-                  value: '12',
-                  label: 'Posts',
-                  color: AppColors.primaryGreen,
-                ),
-                _buildStatItem(
-                  icon: Icons.play_circle,
-                  value: '8',
-                  label: 'Videos',
-                  color: Colors.blue,
-                ),
-                _buildStatItem(
-                  icon: Icons.bookmark,
-                  value: '24',
-                  label: 'Saved',
-                  color: Colors.orange,
-                ),
-                _buildStatItem(
-                  icon: Icons.favorite,
-                  value: '156',
-                  label: 'Likes',
-                  color: Colors.red,
-                ),
-              ],
+            _buildStatItem(
+              icon: Icons.video_library,
+              value: '0', // Replace with real data when available
+              label: 'Videos',
+              color: Colors.blue,
+            ),
+            _buildStatItem(
+              icon: Icons.bookmark,
+              value: '0', // Replace with real data when available
+              label: 'Saved',
+              color: Colors.orange,
             ),
           ],
         ),
@@ -365,104 +229,63 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     required String label,
     required Color color,
   }) {
-    return Expanded(
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 24),
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
           ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
+          child: Icon(icon, color: color, size: 24),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
           ),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.grey.shade600,
-            ),
+        ),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Colors.grey.shade600,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildQuickActions() {
-    final actions = [
-      {
-        'icon': Icons.video_library,
-        'label': 'My Videos',
-        'color': Colors.purple,
-        'onTap': () => _tabController.animateTo(1),
-      },
-      {
-        'icon': Icons.bookmark,
-        'label': 'Saved Posts',
-        'color': Colors.orange,
-        'onTap': () => _tabController.animateTo(2),
-      },
-      {
-        'icon': Icons.edit,
-        'label': 'Edit Profile',
-        'color': Colors.green,
-        'onTap': () => context.push(AppRoutes.editProfile),
-      },
-      {
-        'icon': Icons.settings,
-        'label': 'Settings',
-        'color': Colors.blue,
-        'onTap': () => _showComingSoon('Settings'),
-      },
-    ];
-
+  Widget _buildMinimalActions() {
     return FadeInUp(
       duration: const Duration(milliseconds: 600),
       delay: const Duration(milliseconds: 300),
       child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Row(
           children: [
-            Text(
-              'Quick Actions',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+            Expanded(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                child: _buildSimpleActionButton(
+                  icon: Icons.edit,
+                  label: 'Edit Profile',
+                  color: AppColors.primaryGreen,
+                  onTap: () => context.push(AppRoutes.editProfile),
+                ),
               ),
             ),
-            const SizedBox(height: 16),
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              childAspectRatio: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              children: actions.map((action) => _buildActionTile(
-                icon: action['icon'] as IconData,
-                label: action['label'] as String,
-                color: action['color'] as Color,
-                onTap: action['onTap'] as VoidCallback,
-              )).toList(),
+            Expanded(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                child: _buildSimpleActionButton(
+                  icon: Icons.settings,
+                  label: 'Settings',
+                  color: Colors.grey.shade700,
+                  onTap: () => _showSettingsBottomSheet(),
+                ),
+              ),
             ),
           ],
         ),
@@ -470,7 +293,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     );
   }
 
-  Widget _buildActionTile({
+  Widget _buildSimpleActionButton({
     required IconData icon,
     required String label,
     required Color color,
@@ -479,6 +302,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
@@ -486,17 +310,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             color: color.withValues(alpha: 0.2),
           ),
         ),
-        child: Row(
+        child: Column(
           children: [
-            Container(
-              margin: const EdgeInsets.all(12),
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: color, size: 20),
-            ),
+            Icon(icon, color: color, size: 24),
+            const SizedBox(height: 8),
             Text(
               label,
               style: TextStyle(
@@ -511,206 +328,72 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     );
   }
 
-  Widget _buildSettingsSection() {
-    final settings = [
-      {
-        'icon': Icons.notifications,
-        'title': 'Notifications',
-        'subtitle': 'Manage your notification preferences',
-        'onTap': () => _showComingSoon('Notifications'),
-      },
-      {
-        'icon': Icons.privacy_tip,
-        'title': 'Privacy & Security',
-        'subtitle': 'Control your privacy settings',
-        'onTap': () => _showComingSoon('Privacy & Security'),
-      },
-      {
-        'icon': Icons.help,
-        'title': 'Help & Support',
-        'subtitle': 'Get help and contact support',
-        'onTap': () => _showComingSoon('Help & Support'),
-      },
-      {
-        'icon': Icons.logout,
-        'title': 'Sign Out',
-        'subtitle': 'Sign out of your account',
-        'onTap': () => _showSignOutDialog(),
-      },
-    ];
-
+  Widget _buildTabBar() {
     return FadeInUp(
       duration: const Duration(milliseconds: 600),
       delay: const Duration(milliseconds: 400),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(25),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Settings',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ...settings.map((setting) => _buildSettingItem(
-              icon: setting['icon'] as IconData,
-              title: setting['title'] as String,
-              subtitle: setting['subtitle'] as String,
-              onTap: setting['onTap'] as VoidCallback,
-            )),
+        child: TabBar(
+          controller: _tabController,
+          indicator: BoxDecoration(
+            color: AppColors.primaryGreen,
+            borderRadius: BorderRadius.circular(25),
+          ),
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.grey.shade600,
+          labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+          tabs: const [
+            Tab(text: 'My Posts'),
+            Tab(text: 'Videos'),
+            Tab(text: 'Saved'),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSettingItem({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: AppColors.primaryGreen.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(
-          icon,
-          color: title == 'Sign Out' ? Colors.red : AppColors.primaryGreen,
-        ),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          color: title == 'Sign Out' ? Colors.red : AppColors.textPrimary,
-        ),
-      ),
-      subtitle: Text(subtitle),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-      onTap: onTap,
-    );
+  Widget _buildMyPostsTab() {
+    return _buildEmptyPostsState();
   }
 
-  Widget _buildVideosList(List<Map<String, dynamic>> videos) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: videos.length,
-      itemBuilder: (context, index) {
-        final video = videos[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.shadow,
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: ListTile(
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                width: 60,
-                height: 60,
-                color: AppColors.primaryGreen.withValues(alpha: 0.1),
-                child: const Icon(Icons.play_arrow, color: AppColors.primaryGreen),
-              ),
-            ),
-            title: Text(
-              video['title'] ?? 'Untitled Video',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              '${video['views'] ?? 0} views',
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-            trailing: PopupMenuButton<String>(
-              onSelected: (value) {
-                // Handle video actions
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                const PopupMenuItem(value: 'delete', child: Text('Delete')),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+  Widget _buildMyVideosTab() {
+    return _buildEmptyVideosState();
   }
 
-  Widget _buildSavedPostsList(List<Map<String, dynamic>> posts) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: posts.length,
-      itemBuilder: (context, index) {
-        final post = posts[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.shadow,
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+  Widget _buildSavedPostsTab() {
+    return _buildEmptySavedPostsState();
+  }
+
+  Widget _buildEmptyPostsState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.article_outlined,
+            size: 80,
+            color: Colors.grey.shade400,
           ),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.2),
-              child: Text(
-                (post['authorName'] as String? ?? 'U')[0].toUpperCase(),
-                style: const TextStyle(
-                  color: AppColors.primaryGreen,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+          const SizedBox(height: 16),
+          Text(
+            'No posts yet',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: Colors.grey.shade600,
             ),
-            title: Text(
-              post['content'] ?? '',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              'by ${post['authorName'] ?? 'Unknown'}',
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-            onTap: () {
-              context.push(
-                AppRoutes.postDetails,
-                extra: {'postId': post['id']},
-              );
-            },
           ),
-        );
-      },
+          const SizedBox(height: 8),
+          Text(
+            'Share your first farming experience',
+            style: TextStyle(color: Colors.grey.shade500),
+          ),
+        ],
+      ),
     );
   }
 
@@ -768,31 +451,104 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     );
   }
 
-  Widget _buildLoadingContent() {
-    return const Center(
-      child: LoadingIndicator(
-        size: LoadingSize.medium,
-        message: 'Loading...',
+  void _showSettingsBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.settings, color: AppColors.primaryGreen),
+                const SizedBox(width: 12),
+                Text(
+                  'Settings',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _buildSettingOption(
+              icon: Icons.notifications,
+              title: 'Notifications',
+              subtitle: 'Manage notification preferences',
+              onTap: () => _showComingSoon('Notifications'),
+            ),
+            _buildSettingOption(
+              icon: Icons.privacy_tip,
+              title: 'Privacy & Security',
+              subtitle: 'Control your privacy settings',
+              onTap: () => _showComingSoon('Privacy & Security'),
+            ),
+            _buildSettingOption(
+              icon: Icons.help,
+              title: 'Help & Support',
+              subtitle: 'Get help and contact support',
+              onTap: () => _showComingSoon('Help & Support'),
+            ),
+            _buildSettingOption(
+              icon: Icons.logout,
+              title: 'Sign Out',
+              subtitle: 'Sign out of your account',
+              onTap: () => _showSignOutDialog(),
+              isDestructive: true,
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildErrorContent(String message) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.error_outline,
-            size: 60,
-            color: Colors.red.shade400,
+  Widget _buildSettingOption({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    bool isDestructive = false,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: Icon(
+          icon,
+          color: isDestructive ? Colors.red : AppColors.primaryGreen,
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: isDestructive ? Colors.red : AppColors.textPrimary,
           ),
-          const SizedBox(height: 16),
-          Text(
-            message,
-            style: TextStyle(color: Colors.red.shade600),
-          ),
-        ],
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(color: Colors.grey.shade600),
+        ),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          size: 16,
+          color: Colors.grey.shade400,
+        ),
+        onTap: () {
+          Navigator.pop(context);
+          onTap();
+        },
       ),
     );
   }
@@ -888,58 +644,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 ),
                 const SizedBox(height: 32),
                 CustomButton(
-                  text: 'Retry',
+                  text: 'Try Again',
                   onPressed: () {
-                    ref.invalidate(currentUserProfileProvider);
-                  },
-                  backgroundColor: Colors.white,
-                  textColor: AppColors.primaryGreen,
-                  icon: const Icon(Icons.refresh),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNoProfileState() {
-    return GradientBackground(
-      child: Center(
-        child: FadeIn(
-          duration: const Duration(milliseconds: 800),
-          child: Container(
-            padding: const EdgeInsets.all(40),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.account_circle_outlined,
-                  size: 100,
-                  color: Colors.white.withValues(alpha: 0.7),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Profile Not Found',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Your profile information could not be loaded. Please try again.',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.8),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                CustomButton(
-                  text: 'Retry',
-                  onPressed: () {
-                    ref.invalidate(currentUserProfileProvider);
+                    // Refresh auth state
+                    ref.invalidate(authStateProvider);
                   },
                   backgroundColor: Colors.white,
                   textColor: AppColors.primaryGreen,
@@ -950,23 +658,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         ),
       ),
     );
-  }
-
-  String _formatJoinDate(DateTime? joinDate) {
-    if (joinDate == null) return 'Recently';
-
-    final now = DateTime.now();
-    final difference = now.difference(joinDate);
-
-    if (difference.inDays < 30) {
-      return '${difference.inDays} days ago';
-    } else if (difference.inDays < 365) {
-      final months = (difference.inDays / 30).floor();
-      return '$months ${months == 1 ? 'month' : 'months'} ago';
-    } else {
-      final years = (difference.inDays / 365).floor();
-      return '$years ${years == 1 ? 'year' : 'years'} ago';
-    }
   }
 
   void _showComingSoon(String feature) {
@@ -992,10 +683,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              final authMethods = ref.read(authMethodsProvider);
-              await authMethods.signOut();
-              if (mounted) {
-                context.go(AppRoutes.auth);
+              try {
+                final authMethods = ref.read(authMethodsProvider);
+                await authMethods.signOut();
+                if (mounted) {
+                  context.go(AppRoutes.auth);
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Sign out failed: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),

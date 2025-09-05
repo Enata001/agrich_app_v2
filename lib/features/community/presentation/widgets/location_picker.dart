@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../../../../core/services/location_service.dart';
 import '../../../../core/theme/app_colors.dart';
 
 
@@ -354,22 +355,39 @@ class _LocationPickerState extends State<LocationPicker> {
     });
 
     try {
-      // Check permissions
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          throw Exception('Location permissions are denied');
-        }
-      }
+      final permissionResult = await LocationService.requestLocationPermission();
 
-      if (permission == LocationPermission.deniedForever) {
-        throw Exception('Location permissions are permanently denied');
+      switch (permissionResult) {
+        case LocationPermissionResult.serviceDisabled:
+          if (mounted) {
+            await LocationService.showLocationServiceDialog(context);
+          }
+          return;
+        case LocationPermissionResult.denied:
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Location permission is required to use this feature'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          return;
+        case LocationPermissionResult.deniedForever:
+          if (mounted) {
+            await LocationService.showLocationPermissionDialog(context);
+          }
+          return;
+        case LocationPermissionResult.error:
+          throw Exception('Failed to request location permission');
+        case LocationPermissionResult.granted:
+          break;
       }
 
       // Get current position
       final Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15),
       );
 
       // Create location data
@@ -388,7 +406,7 @@ class _LocationPickerState extends State<LocationPicker> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Current location obtained successfully!'),
-            backgroundColor: AppColors.success,
+            backgroundColor: Colors.green,
           ),
         );
       }
@@ -396,15 +414,21 @@ class _LocationPickerState extends State<LocationPicker> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to get current location: $e'),
+            content: Text('Failed to get current location: ${e.toString()}'),
             backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Settings',
+              onPressed: () => Geolocator.openAppSettings(),
+            ),
           ),
         );
       }
     } finally {
-      setState(() {
-        _isLoadingCurrentLocation = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingCurrentLocation = false;
+        });
+      }
     }
   }
 }

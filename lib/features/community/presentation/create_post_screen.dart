@@ -1,3 +1,5 @@
+// lib/features/community/presentation/create_post_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,11 +8,8 @@ import 'package:animate_do/animate_do.dart';
 import 'dart:io';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/config/app_config.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../../shared/widgets/custom_button.dart';
 import '../../shared/widgets/custom_input_field.dart';
-
 import '../../../core/providers/app_providers.dart';
 import 'widgets/location_picker.dart';
 
@@ -54,13 +53,14 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: const Text('Create Post'),
         backgroundColor: AppColors.primaryGreen,
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          onPressed: () => context.pop(),
+          onPressed: () => _handleBackPress(),
           icon: const Icon(Icons.close, color: Colors.white),
         ),
         actions: [
@@ -68,59 +68,49 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
             onPressed: _canPost() && !_isLoading
                 ? () => _createPost(currentUser)
                 : null,
-            child: Text(
-              _isLoading ? 'Posting...' : 'Post',
+            child: _isLoading
+                ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            )
+                : Text(
+              'Post',
               style: TextStyle(
                 color: _canPost() && !_isLoading
                     ? Colors.white
                     : Colors.white.withValues(alpha: 0.5),
-                fontWeight: FontWeight.w600,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // User info
-                    _buildUserInfo(currentUser),
-
-                    const SizedBox(height: 20),
-
-                    // Content input
-                    _buildContentInput(),
-
-                    const SizedBox(height: 20),
-
-                    // Selected image preview
-                    if (_selectedImage != null) _buildImagePreview(),
-
-                    // Selected location preview
-                    if (_selectedLocation != null) _buildLocationPreview(),
-
-                    // Tags preview
-                    if (_tags.isNotEmpty) _buildTagsPreview(),
-
-                    const SizedBox(height: 20),
-
-                    // Action buttons
-                    _buildActionButtons(),
-                  ],
-                ),
-              ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildUserInfo(currentUser),
+                const SizedBox(height: 20),
+                _buildContentInput(),
+                const SizedBox(height: 20),
+                if (_selectedImage != null) _buildImagePreview(),
+                if (_selectedLocation != null) _buildLocationDisplay(),
+                _buildTagsSection(),
+                const SizedBox(height: 30),
+                _buildActionButtons(),
+                const SizedBox(height: 20),
+              ],
             ),
-
-            // Bottom toolbar
-            _buildBottomToolbar(),
-          ],
+          ),
         ),
       ),
     );
@@ -132,23 +122,17 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       child: Row(
         children: [
           CircleAvatar(
-            radius: 24,
-            backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.2),
-            backgroundImage: currentUser?.photoURL != null
-                ? NetworkImage(currentUser!.photoURL!)
-                : null,
-            child: currentUser?.photoURL == null
-                ? Text(
+            radius: 20,
+            backgroundColor: AppColors.primaryGreen,
+            child: Text(
               currentUser?.displayName?.isNotEmpty == true
                   ? currentUser!.displayName![0].toUpperCase()
                   : 'U',
               style: const TextStyle(
-                color: AppColors.primaryGreen,
+                color: Colors.white,
                 fontWeight: FontWeight.bold,
-                fontSize: 18,
               ),
-            )
-                : null,
+            ),
           ),
           const SizedBox(width: 12),
           Column(
@@ -158,11 +142,10 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                 currentUser?.displayName ?? 'User',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
                 ),
               ),
               Text(
-                'Share with your community',
+                'Public post',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Colors.grey.shade600,
                 ),
@@ -179,42 +162,43 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       duration: const Duration(milliseconds: 600),
       delay: const Duration(milliseconds: 200),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextFormField(
+          CustomInputField(
             controller: _contentController,
-            decoration: const InputDecoration(
-              hintText: 'What\'s happening in your farm?',
-              border: InputBorder.none,
-              hintStyle: TextStyle(
-                fontSize: 18,
-                color: Colors.grey,
-              ),
-            ),
-            style: const TextStyle(
-              fontSize: 18,
-              height: 1.4,
-            ),
-            maxLines: null,
-            maxLength: AppConfig.maxPostLength,
+            hint: 'What\'s happening in your farm today?',
+            maxLines: 8,
+            maxLength: 500,
             validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Please enter some content';
-              }
-              if (value.trim().length < 10) {
-                return 'Post content must be at least 10 characters';
+              if (value?.trim().isEmpty == true) {
+                return 'Please enter some content for your post';
               }
               return null;
             },
+            onChanged: (value) {
+              setState(() {});
+            },
           ),
-          Text(
-            '$_characterCount/${AppConfig.maxPostLength}',
-            style: TextStyle(
-              color: _characterCount > AppConfig.maxPostLength * 0.9
-                  ? Colors.red
-                  : Colors.grey.shade600,
-              fontSize: 12,
-            ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Share your farming experience, tips, or questions',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 12,
+                ),
+              ),
+              Text(
+                '$_characterCount/500',
+                style: TextStyle(
+                  color: _characterCount > 450 ? AppColors.error : Colors.grey.shade600,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -223,57 +207,65 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
 
   Widget _buildImagePreview() {
     return FadeInUp(
-      duration: const Duration(milliseconds: 600),
-      delay: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 400),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
+        margin: const EdgeInsets.only(bottom: 20),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade300),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        child: Stack(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.file(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Stack(
+            children: [
+              Image.file(
                 _selectedImage!,
                 width: double.infinity,
                 height: 200,
                 fit: BoxFit.cover,
               ),
-            ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: GestureDetector(
-                onTap: () => setState(() => _selectedImage = null),
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.close,
-                    color: Colors.white,
-                    size: 18,
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedImage = null;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildLocationPreview() {
+  Widget _buildLocationDisplay() {
     return FadeInUp(
-      duration: const Duration(milliseconds: 600),
-      delay: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 400),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.only(bottom: 20),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.primaryGreen.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
@@ -283,21 +275,21 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
         ),
         child: Row(
           children: [
-            const Icon(
+            Icon(
               Icons.location_on,
               color: AppColors.primaryGreen,
               size: 20,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _selectedLocation!['name'],
+                    _selectedLocation!['name'] ?? 'Selected Location',
                     style: const TextStyle(
-                      color: AppColors.primaryGreen,
                       fontWeight: FontWeight.w600,
+                      color: AppColors.primaryGreen,
                     ),
                   ),
                   if (_selectedLocation!['address'] != null)
@@ -312,11 +304,15 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
               ),
             ),
             GestureDetector(
-              onTap: () => setState(() => _selectedLocation = null),
-              child: const Icon(
+              onTap: () {
+                setState(() {
+                  _selectedLocation = null;
+                });
+              },
+              child: Icon(
                 Icons.close,
-                color: Colors.grey,
-                size: 18,
+                color: Colors.grey.shade600,
+                size: 20,
               ),
             ),
           ],
@@ -325,48 +321,107 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     );
   }
 
-  Widget _buildTagsPreview() {
+  Widget _buildTagsSection() {
     return FadeInUp(
       duration: const Duration(milliseconds: 600),
-      delay: const Duration(milliseconds: 600),
+      delay: const Duration(milliseconds: 300),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Tags (Optional)',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ..._tags.map((tag) => _buildTagChip(tag, true)),
+              _buildAddTagChip(),
+            ],
+          ),
+          if (_tags.isEmpty)
+            Text(
+              'Add tags to help others discover your post',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 12,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTagChip(String tag, bool isSelected) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: isSelected ? AppColors.primaryGreen : Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '#$tag',
+            style: TextStyle(
+              color: isSelected ? Colors.white : AppColors.textPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (isSelected) ...[
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _tags.remove(tag);
+                });
+              },
+              child: Icon(
+                Icons.close,
+                size: 14,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddTagChip() {
+    return GestureDetector(
+      onTap: _showAddTagDialog,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _tags.map((tag) {
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.primaryGreen.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: AppColors.primaryGreen.withValues(alpha: 0.3),
-                ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.primaryGreen),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.add,
+              size: 16,
+              color: AppColors.primaryGreen,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Add tag',
+              style: TextStyle(
+                color: AppColors.primaryGreen,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '#$tag',
-                    style: const TextStyle(
-                      color: AppColors.primaryGreen,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  GestureDetector(
-                    onTap: () => _removeTag(tag),
-                    child: const Icon(
-                      Icons.close,
-                      color: AppColors.primaryGreen,
-                      size: 14,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
+            ),
+          ],
         ),
       ),
     );
@@ -375,39 +430,23 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   Widget _buildActionButtons() {
     return FadeInUp(
       duration: const Duration(milliseconds: 600),
-      delay: const Duration(milliseconds: 700),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      delay: const Duration(milliseconds: 400),
+      child: Row(
         children: [
-          Text(
-            'Add to your post',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w600,
+          Expanded(
+            child: _buildActionButton(
+              icon: Icons.photo_camera,
+              label: 'Photo',
+              onTap: _pickImage,
             ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _buildActionButton(
-                icon: Icons.photo_camera,
-                label: 'Photo',
-                color: Colors.green,
-                onTap: () => _showImageSourceDialog(),
-              ),
-              _buildActionButton(
-                icon: Icons.location_on,
-                label: 'Location',
-                color: Colors.red,
-                onTap: () => _showLocationPicker(),
-              ),
-              _buildActionButton(
-                icon: Icons.tag,
-                label: 'Tag',
-                color: Colors.blue,
-                onTap: () => _showAddTagDialog(),
-              ),
-            ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildActionButton(
+              icon: Icons.location_on,
+              label: 'Location',
+              onTap: _showLocationPicker,
+            ),
           ),
         ],
       ),
@@ -417,141 +456,31 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   Widget _buildActionButton({
     required IconData icon,
     required String label,
-    required Color color,
     required VoidCallback onTap,
   }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: color.withValues(alpha: 0.3),
-            ),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: color, size: 24),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.primaryGreen.withValues(alpha: 0.3)),
+          borderRadius: BorderRadius.circular(12),
         ),
-      ),
-    );
-  }
-
-  Widget _buildBottomToolbar() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Colors.grey.shade200),
-        ),
-      ),
-      child: CustomButton(
-        text: _isLoading ? 'Creating Post...' : 'Share Post',
-        onPressed: _canPost() && !_isLoading ? () => _createPost(ref.watch(currentUserProvider)) : null,
-        backgroundColor: _canPost() && !_isLoading
-            ? AppColors.primaryGreen
-            : Colors.grey.shade400,
-        textColor: Colors.white,
-        icon: _isLoading ? null : const Icon(Icons.send),
-        isLoading: _isLoading,
-        width: double.infinity,
-      ),
-    );
-  }
-
-  bool _canPost() {
-    return _contentController.text.trim().isNotEmpty &&
-        _contentController.text.trim().length >= 10 &&
-        _characterCount <= AppConfig.maxPostLength;
-  }
-
-  Future<void> _createPost(dynamic currentUser) async {
-    if (!_formKey.currentState!.validate() || currentUser == null) {
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final communityRepository = ref.read(communityRepositoryProvider);
-
-      await communityRepository.createPost(
-        content: _contentController.text.trim(),
-        authorId: currentUser.uid,
-        authorName: currentUser.displayName ?? 'User',
-        authorAvatar: currentUser.photoURL ?? '',
-        imageFile: _selectedImage,
-        location: _selectedLocation?['name'],
-        tags: _tags,
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Post created successfully!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        context.pop(); // Go back to community screen
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to create post: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  void _showImageSourceDialog() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera),
-              title: const Text('Camera'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.camera);
-              },
+            Icon(
+              icon,
+              color: AppColors.primaryGreen,
+              size: 20,
             ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Gallery'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.gallery);
-              },
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.primaryGreen,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -559,30 +488,54 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     );
   }
 
-  Future<void> _pickImage(ImageSource source) async {
-    try {
-      final XFile? image = await _imagePicker.pickImage(
-        source: source,
-        maxWidth: 1920,
-        maxHeight: 1080,
-        imageQuality: 80,
-      );
+  bool _canPost() {
+    return _contentController.text.trim().isNotEmpty;
+  }
 
-      if (image != null) {
-        setState(() {
-          _selectedImage = File(image.path);
-        });
+  Future<void> _pickImage() async {
+    try {
+      final ImageSource? source = await _showImageSourceDialog();
+      if (source != null) {
+        final XFile? image = await _imagePicker.pickImage(
+          source: source,
+          imageQuality: 80,
+          maxWidth: 1024,
+          maxHeight: 1024,
+        );
+
+        if (image != null) {
+          setState(() {
+            _selectedImage = File(image.path);
+          });
+        }
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to pick image: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      _showError('Failed to pick image: $e');
     }
+  }
+
+  Future<ImageSource?> _showImageSourceDialog() async {
+    return showDialog<ImageSource>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Image Source'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Camera'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showLocationPicker() {
@@ -608,10 +561,21 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Add Tag'),
-        content: CustomInputField(
+        content: TextField(
           controller: tagController,
-          hint: 'Enter tag (without #)',
+          decoration: const InputDecoration(
+            hintText: 'Enter tag name (without #)',
+            border: OutlineInputBorder(),
+          ),
           maxLength: 20,
+          onSubmitted: (value) {
+            if (value.trim().isNotEmpty && !_tags.contains(value.trim().toLowerCase())) {
+              setState(() {
+                _tags.add(value.trim().toLowerCase());
+              });
+            }
+            Navigator.pop(context);
+          },
         ),
         actions: [
           TextButton(
@@ -621,7 +585,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
           TextButton(
             onPressed: () {
               final tag = tagController.text.trim().toLowerCase();
-              if (tag.isNotEmpty && !_tags.contains(tag)) {
+              if (tag.isNotEmpty && !_tags.contains(tag) && _tags.length < 5) {
                 setState(() {
                   _tags.add(tag);
                 });
@@ -635,9 +599,88 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     );
   }
 
-  void _removeTag(String tag) {
+
+  Future<void> _createPost(dynamic currentUser) async {
+    if (!_formKey.currentState!.validate() || currentUser == null) {
+      return;
+    }
+
     setState(() {
-      _tags.remove(tag);
+      _isLoading = true;
     });
+
+    try {
+      final communityRepository = ref.read(communityRepositoryProvider);
+
+      await communityRepository.createPost(
+        content: _contentController.text.trim(),
+        authorId: currentUser.uid,
+        authorName: currentUser.displayName ?? 'User',
+        authorAvatar: currentUser.photoURL ?? '',
+        imageFile: _selectedImage,
+        location: _selectedLocation?['name'],
+        tags: _tags,
+
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Post created successfully!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        context.pop(); // Go back to community screen
+      }
+    } catch (e) {
+      _showError('Failed to create post: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+
+  void _handleBackPress() {
+    if (_contentController.text.trim().isNotEmpty ||
+        _selectedImage != null ||
+        _selectedLocation != null ||
+        _tags.isNotEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Discard Post?'),
+          content: const Text('Are you sure you want to discard this post? Your changes will be lost.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                context.pop();
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Discard'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      context.pop();
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
 }

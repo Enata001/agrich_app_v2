@@ -1,3 +1,5 @@
+// lib/features/chat/presentation/chat_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animate_do/animate_do.dart';
@@ -5,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_colors.dart';
@@ -61,6 +64,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       setState(() {
         _isTyping = isTyping;
       });
+
+      // Send typing indicator
+      final currentUser = ref.read(currentUserProvider);
+      if (currentUser != null) {
+        ref.read(chatRepositoryProvider).sendTypingIndicator(
+          widget.chatId,
+          currentUser.uid,
+          isTyping,
+        );
+      }
     }
   }
 
@@ -78,6 +91,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      resizeToAvoidBottomInset: true,
       appBar: _buildAppBar(context),
       body: Column(
         children: [
@@ -88,16 +102,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               loading: () => const Center(
                 child: LoadingIndicator(
                   size: LoadingSize.medium,
-                  color: AppColors.primaryGreen,
                   message: 'Loading messages...',
                 ),
               ),
-              error: (error, stack) => _buildErrorState(context),
+              error: (error, stack) => _buildErrorState(context, error),
             ),
           ),
 
-          // Message Input
-          _buildMessageInput(context, currentUser?.uid ?? ''),
+          // Input Area
+          _buildInputArea(context, currentUser),
         ],
       ),
     );
@@ -106,6 +119,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
       backgroundColor: AppColors.primaryGreen,
+      foregroundColor: Colors.white,
       elevation: 0,
       leading: IconButton(
         onPressed: () => context.pop(),
@@ -114,14 +128,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       title: Row(
         children: [
           CircleAvatar(
-            radius: 20,
+            radius: 18,
             backgroundColor: Colors.white.withValues(alpha: 0.2),
-            backgroundImage: widget.recipientAvatar != null && widget.recipientAvatar!.isNotEmpty
+            backgroundImage: widget.recipientAvatar != null
                 ? CachedNetworkImageProvider(widget.recipientAvatar!)
                 : null,
-            child: widget.recipientAvatar == null || widget.recipientAvatar!.isEmpty
+            child: widget.recipientAvatar == null
                 ? Text(
-              widget.recipientName.isNotEmpty ? widget.recipientName[0].toUpperCase() : 'U',
+              widget.recipientName.isNotEmpty
+                  ? widget.recipientName[0].toUpperCase()
+                  : 'U',
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -138,14 +154,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   widget.recipientName,
                   style: const TextStyle(
                     color: Colors.white,
+                    fontWeight: FontWeight.bold,
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  'Online', // TODO: Implement online status
+                  'Online', // TODO: Implement real online status
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
+                    color: Colors.white.withValues(alpha: 0.7),
                     fontSize: 12,
                   ),
                 ),
@@ -163,59 +180,53 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _buildMessagesList(BuildContext context, List<Map<String, dynamic>> messages, String currentUserId) {
-    if (messages.isEmpty) {
-      return _buildEmptyState(context);
+  Widget _buildMessagesList(BuildContext context, List<dynamic> messagesList, String currentUserId) {
+    if (messagesList.isEmpty) {
+      return _buildEmptyState();
     }
 
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
-      itemCount: messages.length,
+      itemCount: messagesList.length,
       itemBuilder: (context, index) {
-        final message = messages[index];
-        final isCurrentUser = message['senderId'] == currentUserId;
-        final showDate = _shouldShowDate(messages, index);
+        final message = messagesList[index];
+        final isMe = message['senderId'] == currentUserId;
+        final isLast = index == messagesList.length - 1;
 
-        return Column(
-          children: [
-            if (showDate) _buildDateSeparator(message['createdAt'] as DateTime?),
-            FadeInUp(
-              duration: const Duration(milliseconds: 400),
-              delay: Duration(milliseconds: index * 50),
-              child: _buildMessageBubble(context, message, isCurrentUser),
-            ),
-          ],
+        return Container(
+          margin: EdgeInsets.only(bottom: isLast ? 16 : 8),
+          child: _buildMessageBubble(message, isMe),
         );
       },
     );
   }
 
-  Widget _buildMessageBubble(BuildContext context, Map<String, dynamic> message, bool isCurrentUser) {
-    final content = message['content'] as String? ?? '';
-    final type = message['type'] as String? ?? 'text';
-    final createdAt = message['createdAt'] as DateTime?;
-    final imageUrl = message['imageUrl'] as String? ?? '';
+  Widget _buildMessageBubble(Map<String, dynamic> message, bool isMe) {
+    final messageType = message['type'] ?? 'text';
+    final timestamp = message['timestamp'] != null
+        ? DateTime.tryParse(message['timestamp']) ?? DateTime.now()
+        : DateTime.now();
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+    return FadeInUp(
+      duration: const Duration(milliseconds: 300),
       child: Row(
-        mainAxisAlignment: isCurrentUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (!isCurrentUser) ...[
+          if (!isMe) ...[
             CircleAvatar(
-              radius: 16,
-              backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.2),
-              backgroundImage: widget.recipientAvatar != null && widget.recipientAvatar!.isNotEmpty
+              radius: 12,
+              backgroundColor: AppColors.primaryGreen,
+              backgroundImage: widget.recipientAvatar != null
                   ? CachedNetworkImageProvider(widget.recipientAvatar!)
                   : null,
-              child: widget.recipientAvatar == null || widget.recipientAvatar!.isEmpty
+              child: widget.recipientAvatar == null
                   ? Text(
-                widget.recipientName.isNotEmpty ? widget.recipientName[0].toUpperCase() : 'U',
+                widget.recipientName[0].toUpperCase(),
                 style: const TextStyle(
-                  color: AppColors.primaryGreen,
-                  fontSize: 12,
+                  color: Colors.white,
+                  fontSize: 10,
                   fontWeight: FontWeight.bold,
                 ),
               )
@@ -226,150 +237,191 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           Flexible(
             child: Container(
               constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.75,
+                maxWidth: MediaQuery.of(context).size.width * 0.7,
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isCurrentUser ? AppColors.primaryGreen : Colors.grey.shade200,
+                color: isMe ? AppColors.primaryGreen : Colors.white,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(20),
                   topRight: const Radius.circular(20),
-                  bottomLeft: Radius.circular(isCurrentUser ? 20 : 4),
-                  bottomRight: Radius.circular(isCurrentUser ? 4 : 20),
+                  bottomLeft: Radius.circular(isMe ? 20 : 4),
+                  bottomRight: Radius.circular(isMe ? 4 : 20),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (type == 'image' && imageUrl.isNotEmpty) ...[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: CachedNetworkImage(
-                        imageUrl: imageUrl,
-                        width: 200,
-                        height: 150,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          width: 200,
-                          height: 150,
-                          color: Colors.grey.shade300,
-                          child: const Center(
-                            child: CircularProgressIndicator(),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          width: 200,
-                          height: 150,
-                          color: Colors.grey.shade300,
-                          child: const Icon(Icons.error),
-                        ),
-                      ),
-                    ),
-                    if (content != 'Photo') ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        content,
-                        style: TextStyle(
-                          color: isCurrentUser ? Colors.white : Colors.black87,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ] else ...[
-                    Text(
-                      content,
-                      style: TextStyle(
-                        color: isCurrentUser ? Colors.white : Colors.black87,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
+                  if (messageType == 'image')
+                    _buildImageMessage(message, isMe)
+                  else
+                    _buildTextMessage(message, isMe),
                   const SizedBox(height: 4),
-                  Text(
-                    createdAt != null ? timeago.format(createdAt) : '',
-                    style: TextStyle(
-                      color: isCurrentUser ? Colors.white.withValues(alpha: 0.7) : Colors.grey.shade600,
-                      fontSize: 12,
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        timeago.format(timestamp),
+                        style: TextStyle(
+                          color: isMe
+                              ? Colors.white.withValues(alpha: 0.7)
+                              : Colors.grey.shade600,
+                          fontSize: 10,
+                        ),
+                      ),
+                      if (isMe) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          message['isRead'] == true ? Icons.done_all : Icons.done,
+                          size: 12,
+                          color: message['isRead'] == true
+                              ? Colors.blue.shade300
+                              : Colors.white.withValues(alpha: 0.7),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
             ),
           ),
-          if (isCurrentUser) ...[
-            const SizedBox(width: 8),
-            Icon(
-              message['isRead'] == true ? Icons.done_all : Icons.done,
-              size: 16,
-              color: message['isRead'] == true ? AppColors.primaryGreen : Colors.grey,
-            ),
-          ],
+          if (isMe) const SizedBox(width: 40),
         ],
       ),
     );
   }
 
-  Widget _buildMessageInput(BuildContext context, String currentUserId) {
-    return Container(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-        top: 16,
+  Widget _buildTextMessage(Map<String, dynamic> message, bool isMe) {
+    return Text(
+      message['content'] ?? '',
+      style: TextStyle(
+        color: isMe ? Colors.white : AppColors.textPrimary,
+        fontSize: 16,
       ),
+    );
+  }
+
+  Widget _buildImageMessage(Map<String, dynamic> message, bool isMe) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(
+            message['imageUrl'] ?? '',
+            width: 200,
+            height: 200,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Container(
+              width: 200,
+              height: 200,
+              color: Colors.grey.shade300,
+              child: const Icon(Icons.broken_image, size: 50),
+            ),
+          ),
+        ),
+        if (message['content']?.isNotEmpty == true) ...[
+          const SizedBox(height: 8),
+          Text(
+            message['content'],
+            style: TextStyle(
+              color: isMe ? Colors.white : AppColors.textPrimary,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildInputArea(BuildContext context, dynamic currentUser) {
+    return Container(
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 8,
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 4,
             offset: const Offset(0, -2),
           ),
         ],
       ),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: () => _showImagePicker(context, currentUserId),
-            icon: const Icon(Icons.add, color: AppColors.primaryGreen),
-          ),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(25),
+      child: SafeArea(
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: () => _pickImage(),
+              icon: Icon(
+                Icons.camera_alt,
+                color: AppColors.primaryGreen,
               ),
-              child: TextField(
-                controller: _messageController,
-                decoration: const InputDecoration(
-                  hintText: 'Type a message...',
-                  border: InputBorder.none,
-                  isDense: true,
+            ),
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(25),
                 ),
-                textCapitalization: TextCapitalization.sentences,
-                maxLines: 5,
-                minLines: 1,
-                onSubmitted: (_) => _sendMessage(currentUserId),
+                child: TextField(
+                  controller: _messageController,
+                  decoration: InputDecoration(
+                    hintText: 'Type a message...',
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    suffixIcon: IconButton(
+                      onPressed: () {
+                        setState(() {
+                          _showEmojiPicker = !_showEmojiPicker;
+                        });
+                      },
+                      icon: Icon(
+                        Icons.emoji_emotions_outlined,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ),
+                  maxLines: 5,
+                  minLines: 1,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.newline,
+                  onSubmitted: (value) => _sendMessage(currentUser),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          FloatingActionButton.small(
-            onPressed: () => _sendMessage(currentUserId),
-            backgroundColor: AppColors.primaryGreen,
-            child: Icon(
-              _isTyping ? Icons.send : Icons.mic,
-              color: Colors.white,
-              size: 20,
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => _sendMessage(currentUser),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _isTyping ? AppColors.primaryGreen : Colors.grey.shade300,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.send,
+                  color: _isTyping ? Colors.white : Colors.grey.shade600,
+                  size: 20,
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -382,25 +434,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           const SizedBox(height: 16),
           Text(
             'No messages yet',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: Colors.grey.shade600,
-              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Start a conversation with ${widget.recipientName}',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.grey.shade500,
-            ),
-            textAlign: TextAlign.center,
+            'Send a message to start the conversation',
+            style: TextStyle(color: Colors.grey.shade500),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildErrorState(BuildContext context) {
+  Widget _buildErrorState(BuildContext context, Object error) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -412,154 +460,106 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Unable to load messages',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            'Failed to load messages',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: Colors.red.shade600,
-              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Please check your connection and try again',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.grey.shade500,
-            ),
+            error.toString(),
+            style: TextStyle(color: Colors.grey.shade500),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           ElevatedButton(
             onPressed: () {
               ref.invalidate(chatMessagesProvider(widget.chatId));
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryGreen,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Retry'),
+            child: const Text('Try Again'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDateSeparator(DateTime? date) {
-    if (date == null) return const SizedBox.shrink();
-
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 16),
-      child: Row(
-        children: [
-          Expanded(child: Divider(color: Colors.grey.shade300)),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              _formatDate(date),
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          Expanded(child: Divider(color: Colors.grey.shade300)),
-        ],
-      ),
-    );
-  }
-
-  bool _shouldShowDate(List<Map<String, dynamic>> messages, int index) {
-    if (index == 0) return true;
-
-    final currentMessage = messages[index];
-    final previousMessage = messages[index - 1];
-
-    final currentDate = currentMessage['createdAt'] as DateTime?;
-    final previousDate = previousMessage['createdAt'] as DateTime?;
-
-    if (currentDate == null || previousDate == null) return false;
-
-    return currentDate.day != previousDate.day ||
-        currentDate.month != previousDate.month ||
-        currentDate.year != previousDate.year;
-  }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
-    final messageDate = DateTime(date.year, date.month, date.day);
-
-    if (messageDate == today) {
-      return 'Today';
-    } else if (messageDate == yesterday) {
-      return 'Yesterday';
-    } else {
-      return '${date.day}/${date.month}/${date.year}';
-    }
-  }
-
-  Future<void> _sendMessage(String currentUserId) async {
+  Future<void> _sendMessage(dynamic currentUser) async {
     final content = _messageController.text.trim();
-    if (content.isEmpty) return;
+    if (content.isEmpty || currentUser == null) return;
 
-    final currentUser = ref.read(currentUserProvider);
-    if (currentUser == null) return;
+    final messageData = {
+      'chatId': widget.chatId,
+      'senderId': currentUser.uid,
+      'senderName': currentUser.displayName ?? 'User',
+      'content': content,
+      'type': 'text',
+      'timestamp': DateTime.now().toIso8601String(),
+      'isRead': false,
+    };
+
+    // Clear input immediately for better UX
+    _messageController.clear();
+    setState(() {
+      _isTyping = false;
+    });
 
     try {
-      await ref.read(sendMessageProvider.notifier).sendMessage(
-        chatId: widget.chatId,
-        content: content,
-        senderId: currentUserId,
-        senderName: currentUser.displayName ?? 'User',
-      );
+      await ref.read(chatRepositoryProvider).sendMessage(messageData);
 
-      _messageController.clear();
+      // Scroll to bottom
       _scrollToBottom();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send message: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to send message: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
 
-  void _showImagePicker(BuildContext context, String currentUserId) {
-    showModalBottomSheet(
+  Future<void> _pickImage() async {
+    try {
+      final ImageSource? source = await _showImageSourceDialog();
+      if (source != null) {
+        final XFile? image = await _imagePicker.pickImage(
+          source: source,
+          imageQuality: 70,
+          maxWidth: 800,
+          maxHeight: 800,
+        );
+
+        if (image != null) {
+          await _sendImageMessage(File(image.path));
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to pick image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<ImageSource?> _showImageSourceDialog() async {
+    return showDialog<ImageSource>(
       context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
+      builder: (context) => AlertDialog(
+        title: const Text('Select Image Source'),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.camera_alt),
-              title: const Text('Take Photo'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.camera, currentUserId);
-              },
+              title: const Text('Camera'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from Gallery'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.gallery, currentUserId);
-              },
+              title: const Text('Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
           ],
         ),
@@ -567,49 +567,75 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Future<void> _pickImage(ImageSource source, String currentUserId) async {
+  Future<void> _sendImageMessage(File imageFile) async {
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null) return;
+
     try {
-      final XFile? image = await _imagePicker.pickImage(source: source);
-      if (image != null) {
-        final currentUser = ref.read(currentUserProvider);
-        if (currentUser != null) {
-          await ref.read(chatRepositoryProvider).sendImageMessage(
-            widget.chatId,
-            currentUserId,
-            currentUser.displayName ?? 'User',
-            image.path,
-          );
-          _scrollToBottom();
-        }
-      }
+      // Show loading indicator
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Uploading image...'),
+          backgroundColor: AppColors.info,
+        ),
+      );
+
+      // Upload image
+      final imageUrl = await ref.read(chatRepositoryProvider).uploadImage(imageFile);
+
+      final messageData = {
+        'chatId': widget.chatId,
+        'senderId': currentUser.uid,
+        'senderName': currentUser.displayName ?? 'User',
+        'content': _messageController.text.trim(),
+        'type': 'image',
+        'imageUrl': imageUrl,
+        'timestamp': DateTime.now().toIso8601String(),
+        'isRead': false,
+      };
+
+      await ref.read(chatRepositoryProvider).sendMessage(messageData);
+
+      // Clear input
+      _messageController.clear();
+
+      // Scroll to bottom
+      _scrollToBottom();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send image: $e'),
-            backgroundColor: Colors.red,
-          ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to send image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
         );
       }
-    }
+    });
   }
 
   void _showChatOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.transparent,
       builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.search),
-              title: const Text('Search Messages'),
-              onTap: () {
-                Navigator.pop(context);
-                _showSearchDialog(context);
-              },
-            ),
             ListTile(
               leading: const Icon(Icons.block, color: Colors.red),
               title: const Text('Block User'),
@@ -628,37 +654,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showSearchDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Search Messages'),
-        content: TextField(
-          decoration: const InputDecoration(
-            hintText: 'Enter search term...',
-            prefixIcon: Icon(Icons.search),
-          ),
-          onSubmitted: (query) {
-            Navigator.pop(context);
-            // TODO: Implement message search
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Search functionality coming soon!'),
-                backgroundColor: AppColors.info,
-              ),
-            );
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
       ),
     );
   }
