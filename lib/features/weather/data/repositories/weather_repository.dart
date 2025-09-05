@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import '../../../../core/services/weather_service.dart';
 import '../../../../core/services/local_storage_service.dart';
+import '../../../../core/services/weather_service.dart';
 
 class WeatherRepository {
   final WeatherService _weatherService;
@@ -9,14 +9,15 @@ class WeatherRepository {
 
   WeatherRepository(this._weatherService, this._localStorageService);
 
-  // Get current weather - ENHANCED with better error handling
+  // Get current weather - FIXED with proper DateTime handling
   Future<Map<String, dynamic>> getCurrentWeather() async {
     try {
       // Check if cached data is still valid (within 30 minutes)
       if (!_localStorageService.isWeatherDataExpired()) {
         final cachedWeather = _localStorageService.getWeatherData();
         if (cachedWeather != null) {
-          return cachedWeather;
+          // Convert DateTime strings back to DateTime objects
+          return _deserializeWeatherData(cachedWeather);
         }
       }
 
@@ -27,19 +28,26 @@ class WeatherRepository {
         lon: position.longitude,
       );
 
-      // Cache the data with timestamp
-      await _localStorageService.setWeatherData(weatherData);
+      print('Fresh weather data before caching: $weatherData');
+
+      // Serialize DateTime objects for storage, then cache
+      final serializableData = _serializeWeatherData(weatherData);
+      await _localStorageService.setWeatherData(serializableData);
       await _localStorageService.setLastWeatherUpdate(DateTime.now());
 
-      return weatherData;
+      print('Successfully cached weather data');
+      return weatherData; // Return original data with DateTime objects
     } catch (e) {
+      print('Error in getCurrentWeather: $e');
+
       // Try to return cached data even if expired
       final cachedWeather = _localStorageService.getWeatherData();
       if (cachedWeather != null) {
         // Add an indicator that data might be stale
-        cachedWeather['isStale'] = true;
-        cachedWeather['error'] = e.toString();
-        return cachedWeather;
+        final deserializedData = _deserializeWeatherData(cachedWeather);
+        deserializedData['isStale'] = true;
+        deserializedData['error'] = e.toString();
+        return deserializedData;
       }
 
       // If no cached data available, return error with default structure
@@ -53,7 +61,7 @@ class WeatherRepository {
       if (!_localStorageService.isWeatherDataExpired()) {
         final cachedWeather = _localStorageService.getWeatherData();
         if (cachedWeather != null) {
-          return cachedWeather;
+          return _deserializeWeatherData(cachedWeather);
         }
       }
 
@@ -65,8 +73,9 @@ class WeatherRepository {
           lon: position.longitude,
         );
 
-        // Cache the data
-        await _localStorageService.setWeatherData(weatherData);
+        // Serialize for storage
+        final serializableData = _serializeWeatherData(weatherData);
+        await _localStorageService.setWeatherData(serializableData);
         await _localStorageService.setLastWeatherUpdate(DateTime.now());
 
         return weatherData;
@@ -78,17 +87,20 @@ class WeatherRepository {
           cityName: 'Accra,GH',
         );
 
-        // Cache the data
-        await _localStorageService.setWeatherData(weatherData);
+        // Serialize for storage
+        final serializableData = _serializeWeatherData(weatherData);
+        await _localStorageService.setWeatherData(serializableData);
         await _localStorageService.setLastWeatherUpdate(DateTime.now());
 
         return weatherData;
       }
     } catch (e) {
+      print('Error in getCurrentWeatherWithFallback: $e');
+
       // Return cached data if available, even if expired
       final cachedWeather = _localStorageService.getWeatherData();
       if (cachedWeather != null) {
-        return cachedWeather;
+        return _deserializeWeatherData(cachedWeather);
       }
 
       // Return default weather data as last resort
@@ -96,6 +108,53 @@ class WeatherRepository {
     }
   }
 
+  // NEW: Serialize weather data for storage (convert DateTime to ISO strings)
+  Map<String, dynamic> _serializeWeatherData(Map<String, dynamic> weatherData) {
+    final serializable = Map<String, dynamic>.from(weatherData);
+
+    // Convert DateTime objects to ISO strings
+    if (serializable['timestamp'] is DateTime) {
+      serializable['timestamp'] = (serializable['timestamp'] as DateTime).toIso8601String();
+    }
+    if (serializable['sunrise'] is DateTime) {
+      serializable['sunrise'] = (serializable['sunrise'] as DateTime).toIso8601String();
+    }
+    if (serializable['sunset'] is DateTime) {
+      serializable['sunset'] = (serializable['sunset'] as DateTime).toIso8601String();
+    }
+
+    return serializable;
+  }
+
+  // NEW: Deserialize weather data from storage (convert ISO strings back to DateTime)
+  Map<String, dynamic> _deserializeWeatherData(Map<String, dynamic> cachedData) {
+    final deserialized = Map<String, dynamic>.from(cachedData);
+
+    // Convert ISO strings back to DateTime objects
+    if (deserialized['timestamp'] is String) {
+      try {
+        deserialized['timestamp'] = DateTime.parse(deserialized['timestamp']);
+      } catch (e) {
+        deserialized['timestamp'] = DateTime.now();
+      }
+    }
+    if (deserialized['sunrise'] is String) {
+      try {
+        deserialized['sunrise'] = DateTime.parse(deserialized['sunrise']);
+      } catch (e) {
+        deserialized['sunrise'] = DateTime.now();
+      }
+    }
+    if (deserialized['sunset'] is String) {
+      try {
+        deserialized['sunset'] = DateTime.parse(deserialized['sunset']);
+      } catch (e) {
+        deserialized['sunset'] = DateTime.now();
+      }
+    }
+
+    return deserialized;
+  }
 
   Future<List<Map<String, dynamic>>> getWeatherForecast({int days = 5}) async {
     try {
@@ -106,20 +165,28 @@ class WeatherRepository {
         days: days,
       );
 
-      // ✅ PROPER JSON ENCODING
+      // Serialize forecast data for storage
+      final serializableForecast = forecast.map((dailyWeather) =>
+          _serializeWeatherData(dailyWeather)
+      ).toList();
+
       await _localStorageService.setString(
         'weather_forecast',
-        jsonEncode(forecast),
+        jsonEncode(serializableForecast),
       );
 
       return forecast;
     } catch (e) {
-      // ✅ PROPER PARSING OF CACHED DATA
+      print('Error in getWeatherForecast: $e');
+
       final cachedForecast = _localStorageService.getString('weather_forecast');
       if (cachedForecast != null) {
         try {
           final decoded = jsonDecode(cachedForecast) as List;
-          return decoded.cast<Map<String, dynamic>>();
+          // Deserialize each forecast item
+          return decoded.map<Map<String, dynamic>>((item) =>
+              _deserializeWeatherData(item as Map<String, dynamic>)
+          ).toList();
         } catch (parseError) {
           print('Failed to parse cached forecast: $parseError');
         }
@@ -128,7 +195,8 @@ class WeatherRepository {
       return []; // Return empty only as last resort
     }
   }
-  // Get weather by city name - NEW METHOD
+
+  // Get weather by city name - Fixed
   Future<Map<String, dynamic>> getWeatherByCity(String cityName) async {
     try {
       final weatherData = await _weatherService.getCurrentWeather(
@@ -141,12 +209,12 @@ class WeatherRepository {
     }
   }
 
-  // Get farming advice based on weather - ENHANCED implementation
+  // Get farming advice based on weather - Fixed
   Future<String> getFarmingAdvice() async {
     try {
       final weatherData = await getCurrentWeather();
 
-      if (weatherData.containsKey('error')) {
+      if (weatherData.containsKey('error') || weatherData['isError'] == true) {
         return 'Unable to provide farming advice due to weather data unavailability.';
       }
 
@@ -156,7 +224,7 @@ class WeatherRepository {
     }
   }
 
-  // Get weather alerts - NEW METHOD
+  // Get weather alerts
   Future<List<Map<String, dynamic>>> getWeatherAlerts() async {
     try {
       final position = await _weatherService.getCurrentLocation();
@@ -168,7 +236,7 @@ class WeatherRepository {
     }
   }
 
-  // Check if location services are available - NEW METHOD
+  // Check if location services are available
   Future<bool> isLocationServiceAvailable() async {
     try {
       await _weatherService.getCurrentLocation();
@@ -178,12 +246,12 @@ class WeatherRepository {
     }
   }
 
-  // Get weather recommendations for specific crops - NEW METHOD
+  // Get weather recommendations for specific crops
   Future<List<String>> getCropRecommendations(String cropType) async {
     try {
       final weatherData = await getCurrentWeather();
 
-      if (weatherData.containsKey('error')) {
+      if (weatherData.containsKey('error') || weatherData['isError'] == true) {
         return ['Weather data unavailable for crop recommendations'];
       }
 
@@ -193,15 +261,16 @@ class WeatherRepository {
     }
   }
 
-  // Clear weather cache - NEW METHOD
+  // Clear weather cache
   Future<void> clearWeatherCache() async {
     await _localStorageService.remove('weatherData');
     await _localStorageService.remove('lastWeatherUpdate');
     await _localStorageService.remove('weather_forecast');
   }
 
-  // Helper method for error weather data
+  // Helper method for error weather data - FIXED with proper DateTime objects
   Map<String, dynamic> _getErrorWeatherData(String error) {
+    final now = DateTime.now();
     return {
       'error': error,
       'temperature': 0.0,
@@ -215,11 +284,11 @@ class WeatherRepository {
       'windSpeed': 0.0,
       'windDirection': 0,
       'cloudiness': 0,
-      'timestamp': DateTime.now(),
+      'timestamp': now, // DateTime object, not string
       'city': 'Unknown Location',
       'country': '',
-      'sunrise': DateTime.now(),
-      'sunset': DateTime.now(),
+      'sunrise': now, // DateTime object, not string
+      'sunset': now, // DateTime object, not string
       'isError': true,
     };
   }

@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animate_do/animate_do.dart';
@@ -25,18 +24,71 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
     final isFarmingGood = ref.watch(isFarmingWeatherGoodProvider);
 
     return weatherAsync.when(
-      data: (weather) => _buildWeatherCard(context, weather, farmingAdviceAsync, isFarmingGood),
-      loading: () => _buildLoadingCard(),
-      error: (error, stack) {
-        if (error.toString().contains('permission') && !_hasShownPermissionDialog) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _hasShownPermissionDialog = true;
-            LocationService.showLocationPermissionDialog(context);
-          });
+        data: (weather) {
+          // Debug: Print the entire weather object to see its structure
+          print('Full weather data: $weather');
+
+          // Safe temperature extraction with proper type handling
+          final temperature = _getTemperature(weather);
+          print('Extracted temperature: $temperature');
+
+          return _buildWeatherCard(context, weather, farmingAdviceAsync, isFarmingGood);
+        },
+        loading: () => _buildLoadingCard(),
+        error: (error, stack) {
+          print('Weather error: $error');
+          if (error.toString().contains('permission') && !_hasShownPermissionDialog) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _hasShownPermissionDialog = true;
+              LocationService.showLocationPermissionDialog(context);
+            });
+          }
+          return _buildErrorCard(context, error);
         }
-      return _buildErrorCard(context, error);
-      }
     );
+  }
+
+  // Helper method to safely extract temperature
+  double _getTemperature(Map<String, dynamic> weather) {
+    final temp = weather['temperature'];
+    if (temp == null) return 0.0;
+
+    if (temp is double) return temp;
+    if (temp is int) return temp.toDouble();
+    if (temp is String) return double.tryParse(temp) ?? 0.0;
+
+    return 0.0;
+  }
+
+  // Helper method to safely extract string values
+  String _getString(Map<String, dynamic> weather, String key, [String defaultValue = '']) {
+    final value = weather[key];
+    if (value == null) return defaultValue;
+    return value.toString();
+  }
+
+  // Helper method to safely extract integer values
+  int _getInt(Map<String, dynamic> weather, String key, [int defaultValue = 0]) {
+    final value = weather[key];
+    if (value == null) return defaultValue;
+
+    if (value is int) return value;
+    if (value is double) return value.round();
+    if (value is String) return int.tryParse(value) ?? defaultValue;
+
+    return defaultValue;
+  }
+
+  // Helper method to safely extract double values
+  double _getDouble(Map<String, dynamic> weather, String key, [double defaultValue = 0.0]) {
+    final value = weather[key];
+    if (value == null) return defaultValue;
+
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? defaultValue;
+
+    return defaultValue;
   }
 
   Widget _buildWeatherCard(
@@ -45,6 +97,18 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
       AsyncValue<String> farmingAdviceAsync,
       bool isFarmingGood,
       ) {
+
+    // Safe data extraction
+    final temperature = _getTemperature(weather);
+    final description = _getString(weather, 'description', 'Weather data unavailable');
+    final city = _getString(weather, 'city', 'Unknown Location');
+    final country = _getString(weather, 'country', '');
+    final humidity = _getInt(weather, 'humidity');
+    final windSpeed = _getDouble(weather, 'windSpeed');
+    final pressure = _getInt(weather, 'pressure');
+    final icon = _getString(weather, 'icon');
+    final main = _getString(weather, 'main', '');
+
     return FadeIn(
       duration: const Duration(milliseconds: 600),
       child: Container(
@@ -78,21 +142,21 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${weather['temperature']?.round() ?? 0}°C',
+                      '${temperature.round()}°C',
                       style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
                       ),
                     ),
                     Text(
-                      weather['description'] ?? '',
+                      description,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    if (weather['city']?.isNotEmpty == true)
+                    if (city.isNotEmpty && city != 'Unknown Location')
                       Text(
-                        '${weather['city']}, ${weather['country']}',
+                        country.isNotEmpty ? '$city, $country' : city,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppColors.textSecondary,
                         ),
@@ -102,23 +166,24 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
                 Column(
                   children: [
                     // Weather icon
-                    if (weather['icon']?.isNotEmpty == true)
+                    if (icon.isNotEmpty)
                       CachedNetworkImage(
-                        imageUrl: 'https://openweathermap.org/img/wn/${weather['icon']}@2x.png',
+                        imageUrl: 'https://openweathermap.org/img/wn/$icon@2x.png',
                         width: 60,
                         height: 60,
                         errorWidget: (context, url, error) => Icon(
-                          _getWeatherIcon(weather['main'] ?? ''),
+                          _getWeatherIcon(main),
                           size: 60,
                           color: AppColors.primaryGreen,
                         ),
                       )
                     else
                       Icon(
-                        _getWeatherIcon(weather['main'] ?? ''),
+                        _getWeatherIcon(main),
                         size: 60,
                         color: AppColors.primaryGreen,
                       ),
+                    const SizedBox(height: 8),
                     // Farming status indicator
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -149,19 +214,19 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
                   context,
                   Icons.water_drop,
                   'Humidity',
-                  '${weather['humidity'] ?? 0}%',
+                  '$humidity%',
                 ),
                 _buildWeatherDetail(
                   context,
                   Icons.air,
                   'Wind',
-                  '${weather['windSpeed']?.toStringAsFixed(1) ?? 0} m/s',
+                  '${windSpeed.toStringAsFixed(1)} m/s',
                 ),
                 _buildWeatherDetail(
                   context,
                   Icons.compress,
                   'Pressure',
-                  '${weather['pressure'] ?? 0} hPa',
+                  '$pressure hPa',
                 ),
               ],
             ),
@@ -310,7 +375,7 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Unable to load weather data. Using default conditions.',
+            'Unable to load weather data. Please check your connection.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: AppColors.textSecondary,
             ),
@@ -319,7 +384,7 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
           ElevatedButton.icon(
             onPressed: () {
               // Refresh weather data
-              // ref.invalidate(currentWeatherProvider); // Uncomment this in your actual code
+              ref.invalidate(currentWeatherProvider);
             },
             icon: const Icon(Icons.refresh, size: 16),
             label: const Text('Retry'),

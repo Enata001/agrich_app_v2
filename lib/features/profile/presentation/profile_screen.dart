@@ -345,6 +345,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             borderRadius: BorderRadius.circular(25),
           ),
           labelColor: Colors.white,
+          indicatorSize: TabBarIndicatorSize.tab,
           unselectedLabelColor: Colors.grey.shade600,
           labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
           unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
