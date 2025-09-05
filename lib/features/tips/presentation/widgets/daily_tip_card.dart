@@ -145,6 +145,7 @@ class _DailyTipCardState extends ConsumerState<DailyTipCard>
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         height: 1.5,
                         color: AppColors.textPrimary,
+                        fontSize: 14
                       ),
                     ),
                     secondChild: Text(
@@ -152,6 +153,7 @@ class _DailyTipCardState extends ConsumerState<DailyTipCard>
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         height: 1.5,
                         color: AppColors.textPrimary,
+                        fontSize: 14
                       ),
                     ),
                     crossFadeState: _isExpanded

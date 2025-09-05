@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
+import '../../../core/providers/app_providers.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 
@@ -482,15 +483,115 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
     );
   }
 
-  void _startNewChat(BuildContext context) {
-    // TODO: Show user selection dialog or navigate to community to find users
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('New chat functionality coming soon!'),
-        backgroundColor: AppColors.info,
-      ),
+
+    void _startNewChat(BuildContext context) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => Container(
+          height: MediaQuery.of(context).size.height * 0.75,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Text(
+                      'Start New Chat',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _buildUserSearchList(context),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+  Widget _buildUserSearchList(BuildContext context) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: ref.read(chatRepositoryProvider).searchUsers(''), // Empty query to get all users
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(
+            child: Text('No users found. Users will appear here when they join the community.'),
+          );
+        }
+
+        final users = snapshot.data!;
+        final currentUser = ref.read(currentUserProvider);
+
+        // Filter out current user
+        final otherUsers = users.where((user) => user['id'] != currentUser?.uid).toList();
+
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: otherUsers.length,
+          itemBuilder: (context, index) {
+            final user = otherUsers[index];
+            return ListTile(
+              leading: CircleAvatar(
+                backgroundImage: user['photoURL']?.isNotEmpty == true
+                    ? CachedNetworkImageProvider(user['photoURL'])
+                    : null,
+                child: user['photoURL']?.isEmpty != false
+                    ? Text(user['displayName']?[0]?.toUpperCase() ?? 'U')
+                    : null,
+              ),
+              title: Text(user['displayName'] ?? 'Unknown User'),
+              subtitle: Text(user['bio'] ?? 'Farmer'),
+              onTap: () async {
+                Navigator.pop(context);
+                if (currentUser != null) {
+                  try {
+                    final chatId = await ref.read(chatRepositoryProvider).createOrGetChat([
+                      currentUser.uid,
+                      user['id'],
+                    ]);
+
+                    if (mounted) {
+                      context.push(AppRoutes.chat, extra: {
+                        'chatId': chatId,
+                        'recipientName': user['displayName'] ?? 'Unknown User',
+                        'recipientAvatar': user['photoURL'] ?? '',
+                      });
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to start chat: $e')),
+                      );
+                    }
+                  }
+                }
+              },
+            );
+          },
+        );
+      },
     );
   }
+
 }
 
 class ChatShimmer extends StatelessWidget {

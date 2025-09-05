@@ -70,6 +70,7 @@ class FirebaseService {
     return _firestore
         .collection(AppConfig.chatsCollection)
         .where('participants', arrayContains: userId)
+        .where('isActive', isEqualTo: true)
         .orderBy('lastMessageTimestamp', descending: true)
         .snapshots()
         .asyncMap((snapshot) async {
@@ -122,6 +123,7 @@ class FirebaseService {
     return await _firestore
         .collection(AppConfig.chatsCollection)
         .where('participants', arrayContains: userId)
+        .where('isActive', isEqualTo: true)
         .orderBy('lastMessageAt', descending: true)
         .get();
   }
@@ -154,6 +156,28 @@ class FirebaseService {
       return unreadQuery.count ?? 0;
     } catch (e) {
       return 0;
+    }
+  }
+
+  Future<void> sendTypingIndicator(String chatId, String userId, bool isTyping) async {
+    if (isTyping) {
+      await _firestore
+          .collection(AppConfig.chatsCollection)
+          .doc(chatId)
+          .collection('typing')
+          .doc(userId)
+          .set({
+        'userId': userId,
+        'isTyping': true,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    } else {
+      await _firestore
+          .collection(AppConfig.chatsCollection)
+          .doc(chatId)
+          .collection('typing')
+          .doc(userId)
+          .delete();
     }
   }
 
@@ -732,6 +756,7 @@ class FirebaseService {
     return _firestore
         .collection(AppConfig.chatsCollection)
         .where('participants', arrayContains: userId)
+        .where('isActive', isEqualTo: true)
         .orderBy('lastMessageTime', descending: true)
         .snapshots();
   }

@@ -221,34 +221,14 @@ class ChatRepository {
     }
   }
 
-  // Send typing indicator - NEW IMPLEMENTATION
   Future<void> sendTypingIndicator(String chatId, String userId, bool isTyping) async {
     try {
-      if (isTyping) {
-        await FirebaseFirestore.instance
-            .collection(AppConfig.chatsCollection)
-            .doc(chatId)
-            .collection('typing')
-            .doc(userId)
-            .set({
-          'userId': userId,
-          'isTyping': true,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-      } else {
-        await FirebaseFirestore.instance
-            .collection(AppConfig.chatsCollection)
-            .doc(chatId)
-            .collection('typing')
-            .doc(userId)
-            .delete();
-      }
+      await _firebaseService.sendTypingIndicator(chatId, userId, isTyping);
     } catch (e) {
       // Typing indicator failure shouldn't block the app
       print('Failed to send typing indicator: $e');
     }
   }
-
   // Get typing indicators - NEW IMPLEMENTATION
   Stream<List<Map<String, dynamic>>> getTypingIndicators(String chatId, String currentUserId) {
     try {

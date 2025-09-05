@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
+import '../../data/repositories/chat_repository.dart';
 
 final userChatsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, userId)  {
   final chatRepository = ref.watch(chatRepositoryProvider);
@@ -17,28 +18,17 @@ final sendMessageProvider = StateNotifierProvider<SendMessageNotifier, SendMessa
 });
 
 class SendMessageNotifier extends StateNotifier<SendMessageState> {
-  final dynamic _chatRepository;
+  final ChatRepository _chatRepository;
 
   SendMessageNotifier(this._chatRepository) : super(SendMessageState.initial());
 
-  Future<void> sendMessage({
-    required String chatId,
-    required String content,
-    required String senderId,
-    required String senderName,
-  }) async {
+  // ✅ FIXED: Now matches ChatRepository.sendMessage() expectation
+  Future<void> sendMessage(Map<String, dynamic> messageData) async {
     try {
       state = state.copyWith(isLoading: true, error: null);
 
-      final messageData = {
-        'content': content,
-        'senderId': senderId,
-        'senderName': senderName,
-        'type': 'text',
-        'createdAt': DateTime.now(),
-      };
-
-      await _chatRepository.sendMessage(chatId, messageData);
+      // Ensure chatId is included in messageData
+      await _chatRepository.sendMessage(messageData);
       state = state.copyWith(isLoading: false, isSuccess: true);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());

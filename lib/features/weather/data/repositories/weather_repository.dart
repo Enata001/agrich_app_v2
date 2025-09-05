@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../../../../core/services/weather_service.dart';
 import '../../../../core/services/local_storage_service.dart';
 
@@ -94,7 +96,7 @@ class WeatherRepository {
     }
   }
 
-  // Get weather forecast - ENHANCED implementation
+
   Future<List<Map<String, dynamic>>> getWeatherForecast({int days = 5}) async {
     try {
       final position = await _weatherService.getCurrentLocation();
@@ -104,26 +106,28 @@ class WeatherRepository {
         days: days,
       );
 
-      // Cache forecast data
+      // ✅ PROPER JSON ENCODING
       await _localStorageService.setString(
         'weather_forecast',
-        forecast.toString(), // You might want to use proper JSON encoding
+        jsonEncode(forecast),
       );
 
       return forecast;
     } catch (e) {
-      // Try to get cached forecast
+      // ✅ PROPER PARSING OF CACHED DATA
       final cachedForecast = _localStorageService.getString('weather_forecast');
       if (cachedForecast != null) {
-        // Return cached data (you'd need to properly parse this)
-        return [];
+        try {
+          final decoded = jsonDecode(cachedForecast) as List;
+          return decoded.cast<Map<String, dynamic>>();
+        } catch (parseError) {
+          print('Failed to parse cached forecast: $parseError');
+        }
       }
 
-      // Return empty list on error
-      return [];
+      return []; // Return empty only as last resort
     }
   }
-
   // Get weather by city name - NEW METHOD
   Future<Map<String, dynamic>> getWeatherByCity(String cityName) async {
     try {

@@ -230,11 +230,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _refreshData() async {
-    // Simulate refresh delay
-    await Future.delayed(const Duration(seconds: 1));
-
     ref.invalidate(currentWeatherProvider);
     ref.invalidate(dailyTipProvider);
     ref.invalidate(recentVideosProvider);
+    await Future.delayed(const Duration(seconds: 1));
   }
 }

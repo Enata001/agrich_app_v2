@@ -670,15 +670,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              // TODO: Implement block user functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Block functionality coming soon!'),
-                  backgroundColor: AppColors.info,
-                ),
-              );
+              final currentUser = ref.read(currentUserProvider);
+              if (currentUser != null) {
+                try {
+                  // Extract recipient ID from chat participants
+                  final chatInfo = await ref.read(chatRepositoryProvider).getChatInfo(widget.chatId);
+                  final participants = List<String>.from(chatInfo?['participants'] ?? []);
+                  final recipientId = participants.firstWhere(
+                        (id) => id != currentUser.uid,
+                    orElse: () => '',
+                  );
+
+                  if (recipientId.isNotEmpty) {
+                    await ref.read(chatRepositoryProvider).blockUser(currentUser.uid, recipientId);
+
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('User blocked successfully')),
+                      );
+                      context.pop(); // Go back to chat list
+                    }
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to block user: $e')),
+                    );
+                  }
+                }
+              }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Block'),
