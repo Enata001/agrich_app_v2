@@ -227,16 +227,16 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
               final post = posts[index];
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
-                // child: PostCard(
-                //   onLike: () => _likePost(post['id'] ?? ''),
-                //   onTap: () => _navigateToPostDetails(context, post['id']),
-                //   onComment: () =>
-                //       _navigateToPostDetails(context, post['id'] ?? ''),
-                //   onShare: () => _sharePost(post),
-                //   onSave: () => _savePost(post['id'] ?? ''),
-                //   onReport: () => _reportPost(post['id'] ?? ''),
-                //   post: post,
-                // ),
+                child: PostCard(
+                  onLike: () => _likePost(post['id'] ?? ''),
+                  onTap: () => _navigateToPostDetails(context, post['id']),
+                  onComment: () =>
+                      _navigateToPostDetails(context, post['id'] ?? ''),
+                  onShare: () => _sharePost(post),
+                  onSave: () => _savePost(post['id'] ?? ''),
+                  onReport: () => _reportPost(post['id'] ?? ''),
+                  post: post,
+                ),
               );
             },
           ),
