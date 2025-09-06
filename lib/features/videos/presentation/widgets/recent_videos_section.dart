@@ -19,9 +19,8 @@ class RecentVideosSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
+
+
             Text(
               'Recently Watched',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -29,20 +28,7 @@ class RecentVideosSection extends ConsumerWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            TextButton(
-              onPressed: () {
-                // Navigate to videos tab or all videos screen
-              },
-              child: Text(
-                'View All',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.8),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
+
         const SizedBox(height: 16),
         recentVideos.when(
           data: (videos) => videos.isEmpty
@@ -93,7 +79,7 @@ class RecentVideosSection extends ConsumerWidget {
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.3),
+          color: Colors.white.withValues(alpha: 0.5),
           width: 1,
         ),
       ),

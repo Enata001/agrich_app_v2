@@ -80,7 +80,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.3),
+            color: Colors.white.withValues(alpha: 0.5),
             width: 1,
           ),
         ),
@@ -194,23 +194,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.play_circle,
-                  color: Colors.white.withValues(alpha: 0.9),
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Recent Videos',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
+
             const SizedBox(height: 12),
             const RecentVideosSection(),
           ],

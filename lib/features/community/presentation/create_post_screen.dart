@@ -592,7 +592,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
               }
               Navigator.pop(context);
             },
-            child: const Text('Add'),
+            child: const Text('Okay'),
           ),
         ],
       ),

@@ -87,7 +87,7 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
             ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.3),
+              color: Colors.white.withValues(alpha: 0.5),
               width: 1,
             ),
           ),
