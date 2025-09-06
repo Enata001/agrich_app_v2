@@ -1,9 +1,18 @@
+
+import 'package:agrich_app_v2/features/tips/presentation/widgets/tip_details_modal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../shared/widgets/gradient_background.dart';
+import '../../shared/widgets/custom_input_field.dart';
+import 'providers/tips_provider.dart';
+import 'widgets/daily_tip_card.dart';
+import 'widgets/tip_card.dart';
+import 'widgets/tip_shimmer.dart';
 
 class TipsScreen extends ConsumerStatefulWidget {
   const TipsScreen({super.key});
@@ -13,36 +22,103 @@ class TipsScreen extends ConsumerStatefulWidget {
 }
 
 class _TipsScreenState extends ConsumerState<TipsScreen>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, TickerProviderStateMixin {
 
   @override
   bool get wantKeepAlive => true;
 
   final ScrollController _scrollController = ScrollController();
-  String _selectedCategory = 'All';
+  final TextEditingController _searchController = TextEditingController();
+  late AnimationController _headerAnimationController;
+  late Animation<double> _headerAnimation;
+
+  String _selectedCategory = 'all';
+  String _searchQuery = '';
+  bool _showSearch = false;
+  bool _isHeaderVisible = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _headerAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _headerAnimation = CurvedAnimation(
+      parent: _headerAnimationController,
+      curve: Curves.easeInOut,
+    );
+
+    _scrollController.addListener(_onScroll);
+    _headerAnimationController.forward();
+  }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _searchController.dispose();
+    _headerAnimationController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    final offset = _scrollController.offset;
+    final shouldHideHeader = offset > 100;
+
+    if (shouldHideHeader && _isHeaderVisible) {
+      setState(() => _isHeaderVisible = false);
+      _headerAnimationController.reverse();
+    } else if (!shouldHideHeader && !_isHeaderVisible) {
+      setState(() => _isHeaderVisible = true);
+      _headerAnimationController.forward();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
 
+    final categories = ref.watch(tipsCategoriesProvider);
+    final tips = _selectedCategory == 'all'
+        ? ref.watch(allTipsProvider)
+        : ref.watch(tipsByCategoryProvider(_selectedCategory));
+
     return GradientBackground(
-      child: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context),
-            _buildDailyTipSection(),
-            _buildCategoryTabs(),
-            Expanded(
-              child: _buildTipsList(),
-            ),
-          ],
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: Column(
+            children: [
+              SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, -1),
+                  end: Offset.zero,
+                ).animate(_headerAnimation),
+                child: _buildHeader(context),
+              ),
+
+              // Daily Tip Section
+              _buildDailyTipSection(),
+
+              // Search Bar (when active)
+              if (_showSearch) _buildSearchBar(),
+
+              // Category Tabs
+              categories.when(
+                data: (cats) => _buildCategoryTabs(cats),
+                loading: () => const SizedBox(height: 60),
+                error: (_, _) => const SizedBox(),
+              ),
+
+              // Tips List
+              Expanded(
+                child: _buildTipsList(tips),
+              ),
+            ],
+          ),
         ),
+        floatingActionButton: _buildFloatingActionButton(),
       ),
     );
   }
@@ -54,19 +130,52 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
         padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            const Icon(Icons.lightbulb, color: Colors.white, size: 28),
-            const SizedBox(width: 12),
-            Text(
-              'Daily Tips',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.lightbulb,
                 color: Colors.white,
-                fontWeight: FontWeight.bold,
+                size: 24,
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Daily Tips',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'Expert farming advice',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             IconButton(
-              onPressed: () => _showFavorites(),
-              icon: const Icon(Icons.favorite, color: Colors.white),
+              onPressed: () => setState(() => _showSearch = !_showSearch),
+              icon: Icon(
+                _showSearch ? Icons.close : Icons.search,
+                color: Colors.white,
+              ),
+            ),
+            IconButton(
+              onPressed: () => _showSavedTips(),
+              icon: const Icon(
+                Icons.bookmark,
+                color: Colors.white,
+              ),
             ),
           ],
         ),
@@ -80,405 +189,350 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
       delay: const Duration(milliseconds: 200),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryGreen.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.wb_sunny,
-                    color: AppColors.primaryGreen,
-                  ),
+                Icon(
+                  Icons.wb_sunny,
+                  color: Colors.white.withValues(alpha: 0.9),
+                  size: 20,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Text(
-                  'Today\'s Tip',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  "Today's Featured Tip",
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => _toggleFavorite('daily_tip'),
-                  icon: Icon(
-                    Icons.favorite_border,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Water your crops early in the morning to reduce evaporation and give plants time to dry before evening, preventing fungal diseases.',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                height: 1.5,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.info.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.category,
-                    size: 16,
-                    color: AppColors.info,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Irrigation',
-                    style: TextStyle(
-                      color: AppColors.info,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryTabs() {
-    final categories = [
-      'All', 'Planting', 'Irrigation', 'Pest Control',
-      'Fertilization', 'Weather', 'Harvesting'
-    ];
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: categories.map((category) {
-            final isSelected = _selectedCategory == category;
-            return Container(
-              margin: const EdgeInsets.only(right: 12),
-              child: GestureDetector(
-                onTap: () => setState(() => _selectedCategory = category),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? Colors.white
-                        : Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    category,
-                    style: TextStyle(
-                      color: isSelected
-                          ? AppColors.primaryGreen
-                          : Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTipsList() {
-    return FadeInUp(
-      duration: const Duration(milliseconds: 600),
-      delay: const Duration(milliseconds: 400),
-      child: Container(
-        margin: const EdgeInsets.only(top: 10),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: RefreshIndicator(
-          onRefresh: () async {
-            await Future.delayed(const Duration(seconds: 1));
-          },
-          color: AppColors.primaryGreen,
-          child: ListView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.all(20),
-            itemCount: _getMockTips().length,
-            itemBuilder: (context, index) {
-              final tip = _getMockTips()[index];
-              return Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                child: _buildTipCard(tip),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTipCard(Map<String, dynamic> tip) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _getCategoryColor(tip['category']).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    _getCategoryIcon(tip['category']),
-                    color: _getCategoryColor(tip['category']),
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        tip['title'] ?? 'Farming Tip',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        tip['content'] ?? '',
-                        style: TextStyle(
-                          color: Colors.grey.shade700,
-                          fontSize: 14,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => _toggleFavorite(tip['id']),
-                  icon: Icon(
-                    tip['isFavorite'] == true
-                        ? Icons.favorite
-                        : Icons.favorite_border,
-                    color: tip['isFavorite'] == true
-                        ? Colors.red
-                        : Colors.grey.shade600,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _getCategoryColor(tip['category']).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    tip['category'] ?? 'General',
-                    style: TextStyle(
-                      color: _getCategoryColor(tip['category']),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.thumb_up_outlined,
-                      color: Colors.grey.shade600,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${tip['likes'] ?? 0}',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 16),
-                Text(
-                  tip['date'] ?? 'Today',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
+            const DailyTipCard(isHomeScreen: false), // Show full version
           ],
         ),
       ),
     );
   }
 
-  Color _getCategoryColor(String? category) {
-    switch (category) {
-      case 'Planting':
-        return Colors.green;
-      case 'Irrigation':
-        return Colors.blue;
-      case 'Pest Control':
-        return Colors.red;
-      case 'Fertilization':
-        return Colors.orange;
-      case 'Weather':
-        return Colors.purple;
-      case 'Harvesting':
-        return Colors.amber;
-      default:
-        return AppColors.primaryGreen;
-    }
-  }
-
-  IconData _getCategoryIcon(String? category) {
-    switch (category) {
-      case 'Planting':
-        return Icons.eco;
-      case 'Irrigation':
-        return Icons.water_drop;
-      case 'Pest Control':
-        return Icons.bug_report;
-      case 'Fertilization':
-        return Icons.grass;
-      case 'Weather':
-        return Icons.cloud;
-      case 'Harvesting':
-        return Icons.agriculture;
-      default:
-        return Icons.lightbulb;
-    }
-  }
-
-  void _showFavorites() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Favorite tips feature coming soon!'),
-        backgroundColor: AppColors.info,
+  Widget _buildSearchBar() {
+    return FadeInDown(
+      duration: const Duration(milliseconds: 300),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        child: CustomInputField(
+          controller: _searchController,
+          hint: 'Search tips...',
+          prefixIcon: const Icon(Icons.search, color: AppColors.primaryGreen),
+          onChanged: (value) {
+            setState(() => _searchQuery = value.toLowerCase());
+            ref.invalidate(searchTipsProvider);
+          },
+        ),
       ),
     );
   }
 
-  void _toggleFavorite(String? tipId) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Tip saved to favorites!'),
-        backgroundColor: AppColors.success,
+  Widget _buildCategoryTabs(List<String> categories) {
+    return FadeInUp(
+      duration: const Duration(milliseconds: 600),
+      delay: const Duration(milliseconds: 300),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: categories.map((category) {
+              final isSelected = _selectedCategory == category;
+              return Container(
+                margin: const EdgeInsets.only(right: 12),
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedCategory = category),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(25),
+                      border: Border.all(
+                        color: isSelected
+                            ? Colors.transparent
+                            : Colors.white.withValues(alpha: 0.3),
+                        width: 1,
+                      ),
+                      boxShadow: isSelected ? [
+                        BoxShadow(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ] : null,
+                    ),
+                    child: Text(
+                      _formatCategoryName(category),
+                      style: TextStyle(
+                        color: isSelected
+                            ? AppColors.primaryGreen
+                            : Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
       ),
     );
   }
 
-  List<Map<String, dynamic>> _getMockTips() {
-    return [
-      {
-        'id': '1',
-        'title': 'Best Time for Seed Planting',
-        'content': 'Plant seeds 2-3 weeks after the last frost date in your area. Soil temperature should be consistently above 60°F for optimal germination.',
-        'category': 'Planting',
-        'likes': 45,
-        'date': '2 days ago',
-        'isFavorite': false,
+  Widget _buildTipsList(AsyncValue<List<Map<String, dynamic>>> tipsAsync) {
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      child: tipsAsync.when(
+        data: (tips) {
+          final filteredTips = _filterTips(tips);
+
+          if (filteredTips.isEmpty) {
+            return _buildEmptyState();
+          }
+
+          return RefreshIndicator(
+            onRefresh: () => _refreshTips(),
+            color: AppColors.primaryGreen,
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.all(20),
+              itemCount: filteredTips.length,
+              itemBuilder: (context, index) {
+                final tip = filteredTips[index];
+                return FadeInUp(
+                  duration: const Duration(milliseconds: 400),
+                  delay: Duration(milliseconds: index * 50),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: TipCard(
+                      tip: tip,
+                      onTap: () => _viewTipDetails(tip),
+                      onSave: () => _toggleSaveTip(tip),
+                      onLike: () => _toggleLikeTip(tip),
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+        loading: () => _buildLoadingState(),
+        error: (error, stack) => _buildErrorState(error),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: FadeIn(
+        duration: const Duration(milliseconds: 800),
+        child: Container(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGreen.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(60),
+                ),
+                child: Icon(
+                  _searchQuery.isNotEmpty || _selectedCategory != 'all'
+                      ? Icons.search_off
+                      : Icons.lightbulb_outline,
+                  size: 60,
+                  color: AppColors.primaryGreen.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                _searchQuery.isNotEmpty
+                    ? 'No tips found'
+                    : _selectedCategory != 'all'
+                    ? 'No tips in this category'
+                    : 'No tips available',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _searchQuery.isNotEmpty
+                    ? 'Try searching with different keywords'
+                    : 'Check back later for new farming tips',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Colors.grey.shade600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(20),
+      itemCount: 6,
+      itemBuilder: (context, index) {
+        return FadeInUp(
+          duration: const Duration(milliseconds: 400),
+          delay: Duration(milliseconds: index * 100),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            child: const TipCardShimmer(),
+          ),
+        );
       },
-      {
-        'id': '2',
-        'title': 'Natural Pest Deterrent',
-        'content': 'Mix neem oil with water (2 tablespoons per gallon) and spray on plants early morning or evening to deter insects without harmful chemicals.',
-        'category': 'Pest Control',
-        'likes': 67,
-        'date': '3 days ago',
-        'isFavorite': true,
-      },
-      {
-        'id': '3',
-        'title': 'Soil pH Testing',
-        'content': 'Test your soil pH monthly. Most crops prefer pH 6.0-7.0. Add lime to raise pH or sulfur to lower it gradually over time.',
-        'category': 'Fertilization',
-        'likes': 32,
-        'date': '1 week ago',
-        'isFavorite': false,
-      },
-      {
-        'id': '4',
-        'title': 'Weather Pattern Awareness',
-        'content': 'Check 7-day weather forecasts before major farming activities. Avoid harvesting 24 hours before expected rain to prevent crop damage.',
-        'category': 'Weather',
-        'likes': 89,
-        'date': '4 days ago',
-        'isFavorite': false,
-      },
-      {
-        'id': '5',
-        'title': 'Proper Harvesting Time',
-        'content': 'Harvest vegetables early morning when they\'re fully hydrated. This ensures better flavor, longer shelf life, and maximum nutritional value.',
-        'category': 'Harvesting',
-        'likes': 78,
-        'date': '5 days ago',
-        'isFavorite': true,
-      },
-      {
-        'id': '6',
-        'title': 'Efficient Water Management',
-        'content': 'Use drip irrigation or soaker hoses to reduce water waste by up to 50%. Water deeply but less frequently to encourage deep root growth.',
-        'category': 'Irrigation',
-        'likes': 56,
-        'date': '1 week ago',
-        'isFavorite': false,
-      },
-    ];
+    );
+  }
+
+  Widget _buildErrorState(Object error) {
+    return Center(
+      child: FadeIn(
+        duration: const Duration(milliseconds: 800),
+        child: Container(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 80,
+                color: AppColors.error.withValues(alpha: 0.7),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Unable to load tips',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Please check your connection and try again',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Colors.grey.shade600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => _refreshTips(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGreen,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFloatingActionButton() {
+    return FadeInUp(
+      duration: const Duration(milliseconds: 800),
+      delay: const Duration(milliseconds: 600),
+      child: FloatingActionButton(
+        onPressed: () => _scrollToTop(),
+        backgroundColor: AppColors.primaryGreen,
+        child: const Icon(Icons.keyboard_arrow_up, color: Colors.white),
+      ),
+    );
+  }
+
+  // Helper Methods
+  List<Map<String, dynamic>> _filterTips(List<Map<String, dynamic>> tips) {
+    if (_searchQuery.isEmpty) return tips;
+
+    return tips.where((tip) {
+      final title = (tip['title'] as String? ?? '').toLowerCase();
+      final content = (tip['content'] as String? ?? '').toLowerCase();
+      final category = (tip['category'] as String? ?? '').toLowerCase();
+
+      return title.contains(_searchQuery) ||
+          content.contains(_searchQuery) ||
+          category.contains(_searchQuery);
+    }).toList();
+  }
+
+  String _formatCategoryName(String category) {
+    if (category == 'all') return 'All';
+    return category.split(' ').map((word) =>
+    word[0].toUpperCase() + word.substring(1)
+    ).join(' ');
+  }
+
+  Future<void> _refreshTips() async {
+    ref.invalidate(allTipsProvider);
+    ref.invalidate(tipsByCategoryProvider);
+    ref.invalidate(dailyTipProvider);
+    ref.invalidate(tipsCategoriesProvider);
+    await Future.delayed(const Duration(seconds: 1));
+  }
+
+  void _scrollToTop() {
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  void _viewTipDetails(Map<String, dynamic> tip) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => TipDetailsModal(tip: tip),
+    );
+  }
+
+  void _toggleSaveTip(Map<String, dynamic> tip) {
+    final tipId = tip['id'] as String;
+    ref.read(tipsRepositoryProvider).saveTip(tipId, 'current_user_id');
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Tip ${tip['isSaved'] ? 'removed from' : 'saved to'} bookmarks'),
+        backgroundColor: AppColors.primaryGreen,
+      ),
+    );
+  }
+
+  void _toggleLikeTip(Map<String, dynamic> tip) {
+    final tipId = tip['id'] as String;
+    ref.read(tipsRepositoryProvider).likeTip(tipId, 'current_user_id');
+  }
+
+  void _showSavedTips() {
+
+    context.push('/saved-tips');
   }
 }

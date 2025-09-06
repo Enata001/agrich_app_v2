@@ -80,14 +80,14 @@ class FirebaseService {
         final data = doc.data();
         final participants = List<String>.from(data['participants'] ?? []);
 
-        // Find the other participant
+
         final otherUserId = participants.firstWhere(
               (id) => id != userId,
           orElse: () => '',
         );
 
         if (otherUserId.isNotEmpty) {
-          // Get other user's details
+
           final otherUserDoc = await _firestore
               .collection('users')
               .doc(otherUserId)
@@ -95,7 +95,7 @@ class FirebaseService {
 
           final otherUserData = otherUserDoc.data() ?? {};
 
-          // Get unread message count
+
           final unreadCount = await _getUnreadMessageCount(doc.id, userId);
 
           chats.add({
@@ -371,6 +371,15 @@ class FirebaseService {
         .get();
   }
 
+  Future<QuerySnapshot> searchVideos(String query) async {
+    final searchTerms = query.toLowerCase().split(' ');
+    return await _firestore
+        .collection(AppConfig.videosCollection)
+        .where('isActive', isEqualTo: true)
+        .where('searchTerms', arrayContainsAny: searchTerms)
+        .get();
+  }
+
   Future<QuerySnapshot> getVideosByCategory(String category) async {
     return await _firestore
         .collection(AppConfig.videosCollection)
@@ -538,7 +547,7 @@ class FirebaseService {
       final ref = _storage.refFromURL(url);
       await ref.delete();
     } catch (e) {
-      // File might not exist or already deleted
+
     }
   }
 

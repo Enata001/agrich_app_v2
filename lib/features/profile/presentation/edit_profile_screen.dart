@@ -9,6 +9,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../core/theme/app_colors.dart';
 
+import '../../auth/data/models/user_model.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../shared/widgets/custom_button.dart';
 import '../../shared/widgets/custom_input_field.dart';
@@ -109,7 +110,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     );
   }
 
-  Widget _buildEditForm(BuildContext context, dynamic profile) {
+  Widget _buildEditForm(BuildContext context, UserModel profile) {
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -216,7 +217,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 delay: const Duration(milliseconds: 400),
                 child: CustomButton(
                   text: 'Save Changes',
-                  onPressed: _saveProfile,
+                  onPressed: () => _saveProfile(profile),
                   isLoading: _isLoading,
                   width: double.infinity,
                 ),
@@ -459,16 +460,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     }
   }
 
-  Future<void> _saveProfile() async {
+  Future<void> _saveProfile(UserModel currentUser) async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
+    print(currentUser.id);
     try {
-      final currentUser = ref.read(currentUserProvider);
-      if (currentUser == null) {
-        throw Exception('No user logged in');
-      }
+
 
       // Prepare update data
       final updateData = {
@@ -481,12 +480,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       if (_selectedImage != null) {
         final profileProvider = ref.read(profileProviderNotifier.notifier);
         final imageUrl = await profileProvider.uploadProfilePicture(_selectedImage!);
+        print(imageUrl);
         updateData['profilePictureUrl'] = imageUrl;
       }
 
-      // Update profile
       final authMethods = ref.read(authMethodsProvider);
-      await authMethods.updateUserProfile(currentUser.uid, updateData);
+      await authMethods.updateUserProfile(currentUser.id, updateData);
 
       // Refresh profile data
       ref.invalidate(currentUserProfileProvider);

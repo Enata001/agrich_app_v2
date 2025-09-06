@@ -7,7 +7,7 @@ class LocalStorageService {
 
   LocalStorageService(this._prefs);
 
-  // Onboarding
+
   Future<bool> setOnboardingComplete(bool value) async {
     return await _prefs.setBool(CacheKeys.onboardingComplete, value);
   }
@@ -16,7 +16,7 @@ class LocalStorageService {
     return _prefs.getBool(CacheKeys.onboardingComplete) ?? false;
   }
 
-  // User Data
+
   Future<bool> setUserData(Map<String, dynamic> userData) async {
     return await _prefs.setString(CacheKeys.userData, jsonEncode(userData));
   }

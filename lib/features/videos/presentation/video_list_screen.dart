@@ -7,6 +7,7 @@ import '../../../core/providers/app_providers.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 
+import '../../auth/providers/auth_provider.dart';
 import '../../shared/widgets/gradient_background.dart';
 import '../../shared/widgets/loading_indicator.dart';
 import 'providers/video_provider.dart';
@@ -236,10 +237,12 @@ class _VideosListScreenState extends ConsumerState<VideosListScreen> {
   }
 
   void _playVideo(BuildContext context, Map<String, dynamic> video) {
-    // Mark video as watched
     final videosRepository = ref.read(videosRepositoryProvider);
-    videosRepository.markVideoAsWatched(video);
-
+    final videoId = video['id'] as String;
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser != null) {
+      ref.read(videosRepositoryProvider).markVideoAsWatched(videoId, currentUser.uid);
+    }
     // Navigate to video player
     context.push(
       AppRoutes.videoPlayer,

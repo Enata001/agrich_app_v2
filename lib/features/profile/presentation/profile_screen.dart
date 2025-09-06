@@ -1,11 +1,11 @@
-// lib/features/profile/presentation/profile_screen.dart
-
+import 'package:agrich_app_v2/features/auth/data/models/user_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
+import '../../../core/providers/app_providers.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -22,7 +22,6 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen>
     with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
-
   @override
   bool get wantKeepAlive => true;
 
@@ -44,18 +43,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   Widget build(BuildContext context) {
     super.build(context);
 
-    final authState = ref.watch(authStateProvider);
+    final user = ref.watch(currentUserProfileProvider);
+    final offline = UserModel.fromMap(
+      ref.watch(localStorageServiceProvider).getUserData() ?? {},
+    );
 
-    return authState.when(
+    return user.when(
       data: (user) => user != null
           ? _buildAuthenticatedProfile(user)
           : _buildUnauthenticatedState(),
       loading: () => _buildLoadingState(),
-      error: (error, stack) => _buildErrorState(context, error),
+      error: (error, stack) => _buildAuthenticatedProfile(offline),
     );
   }
 
-  Widget _buildAuthenticatedProfile(dynamic user) {
+  Widget _buildAuthenticatedProfile(UserModel user) {
     return GradientBackground(
       child: SafeArea(
         child: Column(
@@ -92,7 +94,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     );
   }
 
-  Widget _buildSimplifiedHeader(dynamic user) {
+  Widget _buildSimplifiedHeader(UserModel user) {
     return FadeInDown(
       duration: const Duration(milliseconds: 600),
       child: Container(
@@ -105,10 +107,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               height: 80,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white,
-                  width: 3,
-                ),
+                border: Border.all(color: Colors.white, width: 3),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.2),
@@ -120,20 +119,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               child: CircleAvatar(
                 radius: 38,
                 backgroundColor: Colors.white,
-                backgroundImage: user.photoURL != null
-                    ? CachedNetworkImageProvider(user.photoURL!)
+                backgroundImage: user.profilePictureUrl != null
+                    ? CachedNetworkImageProvider(user.profilePictureUrl!)
                     : null,
-                child: user.photoURL == null
+                child: user.profilePictureUrl == null
                     ? Text(
-                  user.displayName?.isNotEmpty == true
-                      ? user.displayName![0].toUpperCase()
-                      : 'U',
-                  style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primaryGreen,
-                  ),
-                )
+                        user.username.isNotEmpty == true
+                            ? user.username[0].toUpperCase()
+                            : 'U',
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryGreen,
+                        ),
+                      )
                     : null,
               ),
             ),
@@ -146,7 +145,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    user.displayName ?? 'User',
+                    user.username,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -156,7 +155,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    user.email ?? '',
+                    user.email,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.white.withValues(alpha: 0.9),
                     ),
@@ -165,17 +164,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                   ),
                   const SizedBox(height: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: user.emailVerified
+                      color: user.isPhoneVerified
                           ? Colors.green.withValues(alpha: 0.2)
                           : Colors.orange.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      user.emailVerified ? 'Verified' : 'Unverified',
+                      user.isPhoneVerified ? 'Verified' : 'Unverified',
                       style: TextStyle(
-                        color: user.emailVerified ? Colors.green : Colors.orange,
+                        color: user.isPhoneVerified
+                            ? Colors.green
+                            : Colors.orange,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -249,9 +253,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         ),
         Text(
           label,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Colors.grey.shade600,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
         ),
       ],
     );
@@ -306,9 +310,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: color.withValues(alpha: 0.2),
-          ),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Column(
           children: [
@@ -347,8 +349,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           labelColor: Colors.white,
           indicatorSize: TabBarIndicatorSize.tab,
           unselectedLabelColor: Colors.grey.shade600,
-          labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+          ),
           tabs: const [
             Tab(text: 'My Posts'),
             Tab(text: 'Videos'),
@@ -376,17 +384,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.article_outlined,
-            size: 80,
-            color: Colors.grey.shade400,
-          ),
+          Icon(Icons.article_outlined, size: 80, color: Colors.grey.shade400),
           const SizedBox(height: 16),
           Text(
             'No posts yet',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.grey.shade600,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(color: Colors.grey.shade600),
           ),
           const SizedBox(height: 8),
           Text(
@@ -411,9 +415,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           const SizedBox(height: 16),
           Text(
             'No videos yet',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.grey.shade600,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(color: Colors.grey.shade600),
           ),
           const SizedBox(height: 8),
           Text(
@@ -430,17 +434,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.bookmark_border,
-            size: 80,
-            color: Colors.grey.shade400,
-          ),
+          Icon(Icons.bookmark_border, size: 80, color: Colors.grey.shade400),
           const SizedBox(height: 16),
           Text(
             'No saved posts',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.grey.shade600,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(color: Colors.grey.shade600),
           ),
           const SizedBox(height: 8),
           Text(
@@ -472,9 +472,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 const SizedBox(width: 12),
                 Text(
                   'Settings',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
                 IconButton(
@@ -537,10 +537,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             color: isDestructive ? Colors.red : AppColors.textPrimary,
           ),
         ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(color: Colors.grey.shade600),
-        ),
+        subtitle: Text(subtitle, style: TextStyle(color: Colors.grey.shade600)),
         trailing: Icon(
           Icons.arrow_forward_ios,
           size: 16,

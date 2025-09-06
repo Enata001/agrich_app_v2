@@ -1,7 +1,7 @@
-import 'dart:convert';
+// lib/features/weather/data/repositories/weather_repository.dart
 
-import '../../../../core/services/local_storage_service.dart';
 import '../../../../core/services/weather_service.dart';
+import '../../../../core/services/local_storage_service.dart';
 
 class WeatherRepository {
   final WeatherService _weatherService;
@@ -9,52 +9,7 @@ class WeatherRepository {
 
   WeatherRepository(this._weatherService, this._localStorageService);
 
-  // Get current weather - FIXED with proper DateTime handling
-  Future<Map<String, dynamic>> getCurrentWeather() async {
-    try {
-      // Check if cached data is still valid (within 30 minutes)
-      if (!_localStorageService.isWeatherDataExpired()) {
-        final cachedWeather = _localStorageService.getWeatherData();
-        if (cachedWeather != null) {
-          // Convert DateTime strings back to DateTime objects
-          return _deserializeWeatherData(cachedWeather);
-        }
-      }
-
-      // Fetch fresh weather data using GPS location
-      final position = await _weatherService.getCurrentLocation();
-      final weatherData = await _weatherService.getCurrentWeather(
-        lat: position.latitude,
-        lon: position.longitude,
-      );
-
-      print('Fresh weather data before caching: $weatherData');
-
-      // Serialize DateTime objects for storage, then cache
-      final serializableData = _serializeWeatherData(weatherData);
-      await _localStorageService.setWeatherData(serializableData);
-      await _localStorageService.setLastWeatherUpdate(DateTime.now());
-
-      print('Successfully cached weather data');
-      return weatherData; // Return original data with DateTime objects
-    } catch (e) {
-      print('Error in getCurrentWeather: $e');
-
-      // Try to return cached data even if expired
-      final cachedWeather = _localStorageService.getWeatherData();
-      if (cachedWeather != null) {
-        // Add an indicator that data might be stale
-        final deserializedData = _deserializeWeatherData(cachedWeather);
-        deserializedData['isStale'] = true;
-        deserializedData['error'] = e.toString();
-        return deserializedData;
-      }
-
-      // If no cached data available, return error with default structure
-      return _getErrorWeatherData(e.toString());
-    }
-  }
-
+  // Existing method with enhancements
   Future<Map<String, dynamic>> getCurrentWeatherWithFallback() async {
     try {
       // Check if cached data is still valid
@@ -100,35 +55,140 @@ class WeatherRepository {
       // Return cached data if available, even if expired
       final cachedWeather = _localStorageService.getWeatherData();
       if (cachedWeather != null) {
-        return _deserializeWeatherData(cachedWeather);
+        final deserializedData = _deserializeWeatherData(cachedWeather);
+        deserializedData['cached'] = true;
+        deserializedData['error'] = e.toString();
+        return deserializedData;
       }
 
-      // Return default weather data as last resort
+      // If no cached data available, return error with default structure
       return _getErrorWeatherData(e.toString());
     }
   }
 
-  // NEW: Serialize weather data for storage (convert DateTime to ISO strings)
+  // NEW: Get weather forecast (5-day, 3-hour intervals)
+  Future<List<Map<String, dynamic>>> getWeatherForecast({int days = 5}) async {
+    try {
+      // Try to get location-based forecast
+      try {
+        final position = await _weatherService.getCurrentLocation();
+        return await _weatherService.getWeatherForecast(
+          lat: position.latitude,
+          lon: position.longitude,
+          days: days,
+        );
+      } catch (locationError) {
+        // If location fails, use default location (Accra)
+        return await _weatherService.getWeatherForecast(
+          cityName: 'Accra,GH',
+          days: days,
+        );
+      }
+    } catch (e) {
+      print('Error getting weather forecast: $e');
+      return _getMockForecast(days);
+    }
+  }
+
+  // NEW: Get daily forecast (7-day)
+  Future<List<Map<String, dynamic>>> getDailyForecast({int days = 7}) async {
+    try {
+      // Try to get location-based daily forecast
+      try {
+        final position = await _weatherService.getCurrentLocation();
+        return await _weatherService.getDailyForecast(
+          lat: position.latitude,
+          lon: position.longitude,
+          days: days,
+        );
+      } catch (locationError) {
+        // If location fails, use default location (Accra)
+        return await _weatherService.getDailyForecast(
+          cityName: 'Accra,GH',
+          days: days,
+        );
+      }
+    } catch (e) {
+      print('Error getting daily forecast: $e');
+      return _getMockDailyForecast(days);
+    }
+  }
+
+  // NEW: Get weather by coordinates
+  Future<Map<String, dynamic>> getWeatherByCoordinates(double lat, double lon) async {
+    try {
+      return await _weatherService.getCurrentWeather(lat: lat, lon: lon);
+    } catch (e) {
+      throw Exception('Failed to get weather for coordinates: $e');
+    }
+  }
+
+  // NEW: Get weather by city name
+  Future<Map<String, dynamic>> getWeatherByCity(String cityName) async {
+    try {
+      return await _weatherService.getCurrentWeather(cityName: cityName);
+    } catch (e) {
+      throw Exception('Failed to get weather for city: $e');
+    }
+  }
+
+  // NEW: Get weather alerts (requires OneCall API)
+  Future<List<Map<String, dynamic>>> getWeatherAlerts() async {
+    try {
+      final position = await _weatherService.getCurrentLocation();
+      return await _weatherService.getWeatherAlerts(
+        lat: position.latitude,
+        lon: position.longitude,
+      );
+    } catch (e) {
+      print('Error getting weather alerts: $e');
+      return [];
+    }
+  }
+
+  // Enhanced farming advice method
+  String getFarmingAdvice(Map<String, dynamic> weather) {
+    return _weatherService.getFarmingAdvice(weather);
+  }
+
+  // NEW: Check if weather is suitable for farming
+  bool isWeatherSuitableForFarming(Map<String, dynamic> weather) {
+    final temperature = weather['temperature'] as double? ?? 0.0;
+    final humidity = weather['humidity'] as int? ?? 0;
+    final windSpeed = weather['windSpeed'] as double? ?? 0.0;
+    final condition = weather['main'] as String? ?? '';
+
+    // Define suitable farming conditions
+    final isTemperatureGood = temperature >= 15 && temperature <= 35;
+    final isHumidityGood = humidity >= 30 && humidity <= 80;
+    final isWindGood = windSpeed < 20; // Less than 20 m/s
+    final isConditionGood = !condition.toLowerCase().contains('thunderstorm') &&
+        !condition.toLowerCase().contains('tornado') &&
+        !condition.toLowerCase().contains('snow');
+
+    return isTemperatureGood && isHumidityGood && isWindGood && isConditionGood;
+  }
+
+  // Helper methods for data serialization
   Map<String, dynamic> _serializeWeatherData(Map<String, dynamic> weatherData) {
     final serializable = Map<String, dynamic>.from(weatherData);
 
-    // Convert DateTime objects to ISO strings
+    // Convert DateTime objects to ISO strings for storage
     if (serializable['timestamp'] is DateTime) {
       serializable['timestamp'] = (serializable['timestamp'] as DateTime).toIso8601String();
     }
     if (serializable['sunrise'] is DateTime) {
-      serializable['sunrise'] = (serializable['sunrise'] as DateTime).toIso8601String();
+      serializable['sunrise'] = (serializable['sunrise'] as DateTime).millisecondsSinceEpoch ~/ 1000;
     }
     if (serializable['sunset'] is DateTime) {
-      serializable['sunset'] = (serializable['sunset'] as DateTime).toIso8601String();
+      serializable['sunset'] = (serializable['sunset'] as DateTime).millisecondsSinceEpoch ~/ 1000;
     }
 
     return serializable;
   }
 
-  // NEW: Deserialize weather data from storage (convert ISO strings back to DateTime)
-  Map<String, dynamic> _deserializeWeatherData(Map<String, dynamic> cachedData) {
-    final deserialized = Map<String, dynamic>.from(cachedData);
+  Map<String, dynamic> _deserializeWeatherData(Map<String, dynamic> weatherData) {
+    final deserialized = Map<String, dynamic>.from(weatherData);
 
     // Convert ISO strings back to DateTime objects
     if (deserialized['timestamp'] is String) {
@@ -138,210 +198,75 @@ class WeatherRepository {
         deserialized['timestamp'] = DateTime.now();
       }
     }
-    if (deserialized['sunrise'] is String) {
-      try {
-        deserialized['sunrise'] = DateTime.parse(deserialized['sunrise']);
-      } catch (e) {
-        deserialized['sunrise'] = DateTime.now();
-      }
-    }
-    if (deserialized['sunset'] is String) {
-      try {
-        deserialized['sunset'] = DateTime.parse(deserialized['sunset']);
-      } catch (e) {
-        deserialized['sunset'] = DateTime.now();
-      }
-    }
 
     return deserialized;
   }
 
-  Future<List<Map<String, dynamic>>> getWeatherForecast({int days = 5}) async {
-    try {
-      final position = await _weatherService.getCurrentLocation();
-      final forecast = await _weatherService.getWeatherForecast(
-        lat: position.latitude,
-        lon: position.longitude,
-        days: days,
-      );
-
-      // Serialize forecast data for storage
-      final serializableForecast = forecast.map((dailyWeather) =>
-          _serializeWeatherData(dailyWeather)
-      ).toList();
-
-      await _localStorageService.setString(
-        'weather_forecast',
-        jsonEncode(serializableForecast),
-      );
-
-      return forecast;
-    } catch (e) {
-      print('Error in getWeatherForecast: $e');
-
-      final cachedForecast = _localStorageService.getString('weather_forecast');
-      if (cachedForecast != null) {
-        try {
-          final decoded = jsonDecode(cachedForecast) as List;
-          // Deserialize each forecast item
-          return decoded.map<Map<String, dynamic>>((item) =>
-              _deserializeWeatherData(item as Map<String, dynamic>)
-          ).toList();
-        } catch (parseError) {
-          print('Failed to parse cached forecast: $parseError');
-        }
-      }
-
-      return []; // Return empty only as last resort
-    }
-  }
-
-  // Get weather by city name - Fixed
-  Future<Map<String, dynamic>> getWeatherByCity(String cityName) async {
-    try {
-      final weatherData = await _weatherService.getCurrentWeather(
-        cityName: cityName,
-      );
-
-      return weatherData;
-    } catch (e) {
-      return _getErrorWeatherData(e.toString());
-    }
-  }
-
-  // Get farming advice based on weather - Fixed
-  Future<String> getFarmingAdvice() async {
-    try {
-      final weatherData = await getCurrentWeather();
-
-      if (weatherData.containsKey('error') || weatherData['isError'] == true) {
-        return 'Unable to provide farming advice due to weather data unavailability.';
-      }
-
-      return _weatherService.getFarmingAdvice(weatherData);
-    } catch (e) {
-      return 'Unable to provide farming advice at the moment. Please try again later.';
-    }
-  }
-
-  // Get weather alerts
-  Future<List<Map<String, dynamic>>> getWeatherAlerts() async {
-    try {
-      final position = await _weatherService.getCurrentLocation();
-      // This would require a weather service method for alerts
-      // For now, return empty list
-      return [];
-    } catch (e) {
-      return [];
-    }
-  }
-
-  // Check if location services are available
-  Future<bool> isLocationServiceAvailable() async {
-    try {
-      await _weatherService.getCurrentLocation();
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  // Get weather recommendations for specific crops
-  Future<List<String>> getCropRecommendations(String cropType) async {
-    try {
-      final weatherData = await getCurrentWeather();
-
-      if (weatherData.containsKey('error') || weatherData['isError'] == true) {
-        return ['Weather data unavailable for crop recommendations'];
-      }
-
-      return _generateCropSpecificAdvice(cropType, weatherData);
-    } catch (e) {
-      return ['Unable to generate crop recommendations at this time'];
-    }
-  }
-
-  // Clear weather cache
-  Future<void> clearWeatherCache() async {
-    await _localStorageService.remove('weatherData');
-    await _localStorageService.remove('lastWeatherUpdate');
-    await _localStorageService.remove('weather_forecast');
-  }
-
-  // Helper method for error weather data - FIXED with proper DateTime objects
   Map<String, dynamic> _getErrorWeatherData(String error) {
-    final now = DateTime.now();
     return {
-      'error': error,
-      'temperature': 0.0,
-      'feelsLike': 0.0,
-      'humidity': 0,
-      'pressure': 0,
-      'visibility': 0,
-      'description': 'Weather data unavailable',
-      'main': 'Unknown',
+      'temperature': 25.0,
+      'feelsLike': 27.0,
+      'humidity': 60,
+      'pressure': 1013,
+      'windSpeed': 3.0,
+      'windDeg': 180,
+      'visibility': 10,
+      'clouds': 25,
+      'main': 'Clear',
+      'description': 'clear sky',
       'icon': '01d',
-      'windSpeed': 0.0,
-      'windDirection': 0,
-      'cloudiness': 0,
-      'timestamp': now, // DateTime object, not string
-      'city': 'Unknown Location',
-      'country': '',
-      'sunrise': now, // DateTime object, not string
-      'sunset': now, // DateTime object, not string
-      'isError': true,
+      'name': 'Accra',
+      'country': 'GH',
+      'sunrise': DateTime.now().subtract(const Duration(hours: 2)).millisecondsSinceEpoch ~/ 1000,
+      'sunset': DateTime.now().add(const Duration(hours: 6)).millisecondsSinceEpoch ~/ 1000,
+      'timestamp': DateTime.now(),
+      'error': true,
+      'errorMessage': error,
     };
   }
 
-  // Helper method for crop-specific advice
-  List<String> _generateCropSpecificAdvice(String cropType, Map<String, dynamic> weather) {
-    final temp = weather['temperature'] as double? ?? 0.0;
-    final humidity = weather['humidity'] as int? ?? 0;
-    final description = weather['description'] as String? ?? '';
+  List<Map<String, dynamic>> _getMockForecast(int days) {
+    final forecast = <Map<String, dynamic>>[];
+    final now = DateTime.now();
 
-    final List<String> advice = [];
-
-    switch (cropType.toLowerCase()) {
-      case 'tomatoes':
-        if (temp > 30) {
-          advice.add('Provide shade for tomato plants during hot weather');
-        }
-        if (humidity > 80) {
-          advice.add('Watch for blight and fungal diseases in high humidity');
-        }
-        if (description.contains('rain')) {
-          advice.add('Cover tomato plants to prevent fruit cracking');
-        }
-        break;
-
-      case 'lettuce':
-        if (temp > 25) {
-          advice.add('Lettuce may bolt in hot weather - harvest early');
-        }
-        if (description.contains('sun')) {
-          advice.add('Provide afternoon shade for lettuce');
-        }
-        break;
-
-      case 'corn':
-        if (description.contains('rain')) {
-          advice.add('Good growing conditions for corn');
-        }
-        if (temp < 10) {
-          advice.add('Wait for warmer weather before planting corn');
-        }
-        break;
-
-      default:
-        advice.add('Monitor weather conditions for optimal crop growth');
-        if (temp > 35) {
-          advice.add('Provide extra water and shade during extreme heat');
-        }
-        if (temp < 5) {
-          advice.add('Protect crops from potential frost damage');
-        }
+    for (int i = 0; i < days * 8; i++) { // 8 forecasts per day (every 3 hours)
+      final dateTime = now.add(Duration(hours: i * 3));
+      forecast.add({
+        'temperature': 25.0 + (i % 10) - 5, // Varying temperature
+        'feelsLike': 27.0 + (i % 10) - 5,
+        'humidity': 60 + (i % 20) - 10,
+        'pressure': 1013 + (i % 20) - 10,
+        'windSpeed': 3.0 + (i % 5),
+        'main': i % 3 == 0 ? 'Clouds' : 'Clear',
+        'description': i % 3 == 0 ? 'scattered clouds' : 'clear sky',
+        'icon': i % 3 == 0 ? '03d' : '01d',
+        'timestamp': dateTime,
+      });
     }
 
-    return advice.isEmpty ? ['No specific advice available for this crop'] : advice;
+    return forecast;
+  }
+
+  List<Map<String, dynamic>> _getMockDailyForecast(int days) {
+    final forecast = <Map<String, dynamic>>[];
+    final now = DateTime.now();
+
+    for (int i = 0; i < days; i++) {
+      final dateTime = now.add(Duration(days: i));
+      forecast.add({
+        'maxTemp': 30.0 + (i % 8) - 4,
+        'minTemp': 20.0 + (i % 6) - 3,
+        'temperature': 25.0 + (i % 7) - 3,
+        'humidity': 65 + (i % 15) - 7,
+        'pressure': 1013 + (i % 10) - 5,
+        'windSpeed': 4.0 + (i % 4),
+        'main': i % 4 == 0 ? 'Rain' : (i % 3 == 0 ? 'Clouds' : 'Clear'),
+        'description': i % 4 == 0 ? 'light rain' : (i % 3 == 0 ? 'partly cloudy' : 'clear sky'),
+        'icon': i % 4 == 0 ? '10d' : (i % 3 == 0 ? '02d' : '01d'),
+        'timestamp': dateTime,
+      });
+    }
+
+    return forecast;
   }
 }

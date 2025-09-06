@@ -19,7 +19,7 @@ class RouteTransitions {
       Animation<double> secondaryAnimation,
       Widget child,
       ) {
-    const begin = Offset(1.0, 0.0); // Slide in from right
+    const begin = Offset(1.0, 0.0);
     const end = Offset.zero;
     const curve = Curves.fastOutSlowIn;
 
@@ -69,12 +69,12 @@ class RouteTransitions {
 
     final slideOut = Tween<Offset>(
       begin: Offset.zero,
-      end: const Offset(-0.3, 0.0), // 👈 subtle pull-back
+      end: const Offset(-0.3, 0.0),
     ).chain(CurveTween(curve: Curves.easeInOut));
 
     final scaleOut = Tween<double>(
       begin: 1.0,
-      end: 0.95, // 👈 slight shrink on pop
+      end: 0.95,
     ).chain(CurveTween(curve: Curves.easeOut));
 
     return SlideTransition(

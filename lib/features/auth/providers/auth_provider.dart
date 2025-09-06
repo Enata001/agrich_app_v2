@@ -4,13 +4,9 @@ import '../../../core/providers/app_providers.dart';
 import '../data/models/user_model.dart';
 import '../data/repositories/auth_repository.dart';
 
-// Auth State Provider
-final authStateProvider = StreamProvider<User?>((ref) {
-  final authRepository = ref.watch(authRepositoryProvider);
-  return authRepository.authStateChanges;
-});
 
-// Current User Provider
+
+
 final currentUserProvider = Provider<User?>((ref) {
   final authState = ref.watch(authStateProvider);
   return authState.when(
@@ -20,13 +16,13 @@ final currentUserProvider = Provider<User?>((ref) {
   );
 });
 
-// User Profile Provider
+
 final userProfileProvider = FutureProvider.family<UserModel?, String>((ref, uid) async {
   final authRepository = ref.watch(authRepositoryProvider);
   return await authRepository.getUserProfile(uid);
 });
 
-// Current User Profile Provider
+
 final currentUserProfileProvider = FutureProvider<UserModel?>((ref) async {
   final user = ref.watch(currentUserProvider);
   if (user == null) return null;
@@ -35,25 +31,25 @@ final currentUserProfileProvider = FutureProvider<UserModel?>((ref) async {
   return await authRepository.getUserProfile(user.uid);
 });
 
-// Auth Methods Provider
+
 final authMethodsProvider = Provider<AuthMethods>((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
   return AuthMethods(authRepository);
 });
 
-// Phone Verification State Provider
+
 final phoneVerificationProvider = StateNotifierProvider<PhoneVerificationNotifier, PhoneVerificationState>((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
   return PhoneVerificationNotifier(authRepository);
 });
 
-// Sign-In Method Detection Provider
+
 final signInMethodProvider = FutureProvider.family<SignInMethod, String>((ref, identifier) async {
   final authRepository = ref.watch(authRepositoryProvider);
   return await authRepository.detectSignInMethod(identifier);
 });
 
-// Phone Verification State
+
 class PhoneVerificationState {
   final String? verificationId;
   final String? phoneNumber;

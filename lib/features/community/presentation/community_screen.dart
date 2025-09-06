@@ -1,5 +1,6 @@
 // lib/features/community/presentation/community_screen.dart
 
+import 'package:agrich_app_v2/features/shared/widgets/custom_input_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animate_do/animate_do.dart';
@@ -76,7 +77,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     return FadeInDown(
       duration: const Duration(milliseconds: 600),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
             if (_showSearch) ...[
@@ -122,38 +123,11 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     return FadeInDown(
       duration: const Duration(milliseconds: 400),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
         child: SafeArea(
-          child: TextField(
+          child:CustomInputField(
             controller: _searchController,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: 'Search posts...',
-              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.2),
-              prefixIcon: const Icon(Icons.search, color: Colors.white),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      onPressed: () {
-                        setState(() {
-                          _searchController.clear();
-                          _searchQuery = '';
-                        });
-                      },
-                      icon: const Icon(Icons.clear, color: Colors.white),
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(25),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 16,
-              ),
-            ),
-            style: const TextStyle(color: Colors.white),
+            hint: "Search posts...",
             onChanged: (value) {
               setState(() {
                 _searchQuery = value.trim().toLowerCase();
@@ -253,16 +227,16 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
               final post = posts[index];
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
-                child: PostCard(
-                  onLike: () => _likePost(post['id'] ?? ''),
-                  onTap: () => _navigateToPostDetails(context, post['id']),
-                  onComment: () =>
-                      _navigateToPostDetails(context, post['id'] ?? ''),
-                  onShare: () => _sharePost(post),
-                  onSave: () => _savePost(post['id'] ?? ''),
-                  onReport: () => _reportPost(post['id'] ?? ''),
-                  post: post,
-                ),
+                // child: PostCard(
+                //   onLike: () => _likePost(post['id'] ?? ''),
+                //   onTap: () => _navigateToPostDetails(context, post['id']),
+                //   onComment: () =>
+                //       _navigateToPostDetails(context, post['id'] ?? ''),
+                //   onShare: () => _sharePost(post),
+                //   onSave: () => _savePost(post['id'] ?? ''),
+                //   onReport: () => _reportPost(post['id'] ?? ''),
+                //   post: post,
+                // ),
               );
             },
           ),

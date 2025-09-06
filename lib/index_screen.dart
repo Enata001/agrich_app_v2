@@ -48,7 +48,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       CurvedAnimation(parent: _textController, curve: Curves.easeInOut),
     );
 
-    // Start animations
+
     _logoController.forward();
     Future.delayed(const Duration(milliseconds: 500), () {
       _textController.forward();
@@ -57,26 +57,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   Future<void> _initializeApp() async {
     try {
-      // Wait for animations to complete
+
       await Future.delayed(const Duration(seconds: 3));
 
-      // Initialize SharedPreferences
+
       await ref.read(sharedPreferencesInitProvider.future);
 
-      // Check authentication and routing logic
+
       final localStorage = ref.read(localStorageServiceProvider);
       final authRepository = ref.read(authRepositoryProvider);
 
-      // Check if user has completed onboarding
+
       final hasOnboarded = localStorage.isOnboardingComplete();
 
       if (!hasOnboarded) {
-        // First time user - go to onboarding
+
         if (mounted) context.go(AppRoutes.onboarding);
         return;
       }
 
-      // Check if user is signed in
+
       final isSignedIn = authRepository.isSignedIn;
       final currentUser = authRepository.currentUser;
 
@@ -86,12 +86,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
         if (mounted) context.go(AppRoutes.main);
       } else {
-        // User not signed in - go to auth screen
+
         if (mounted) context.go(AppRoutes.auth);
       }
 
     } catch (e) {
-      // Fallback to auth screen on any error
+
       if (mounted) context.go(AppRoutes.auth);
     }
   }
@@ -118,7 +118,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             children: [
               const Spacer(),
 
-              // Logo Animation
+
               AnimatedBuilder(
                 animation: _logoAnimation,
                 builder: (context, child) {
@@ -135,7 +135,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
               const SizedBox(height: 40),
 
-              // App Name Animation
+
               AnimatedBuilder(
                 animation: _textAnimation,
                 builder: (context, child) {

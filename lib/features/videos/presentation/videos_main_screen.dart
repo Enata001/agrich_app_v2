@@ -1,10 +1,18 @@
+import 'package:agrich_app_v2/features/videos/presentation/widgets/video_shimmer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../../core/theme/app_colors.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/providers/app_providers.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../shared/widgets/gradient_background.dart';
+import '../../shared/widgets/loading_indicator.dart';
+import '../../shared/widgets/custom_input_field.dart';
+import 'providers/video_provider.dart';
+import 'widgets/video_card.dart';
+import 'widgets/video_stats_card.dart';
 
 class VideosMainScreen extends ConsumerStatefulWidget {
   const VideosMainScreen({super.key});
@@ -14,35 +22,97 @@ class VideosMainScreen extends ConsumerStatefulWidget {
 }
 
 class _VideosMainScreenState extends ConsumerState<VideosMainScreen>
-    with AutomaticKeepAliveClientMixin {
-
+    with AutomaticKeepAliveClientMixin, TickerProviderStateMixin {
   @override
   bool get wantKeepAlive => true;
 
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  late AnimationController _headerAnimationController;
+  late Animation<double> _headerAnimation;
+
   String _selectedCategory = 'All';
+  String _selectedFilter = 'recent'; // recent, popular, trending
+  String _searchQuery = '';
+  bool _showSearch = false;
+  bool _isHeaderVisible = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _headerAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _headerAnimation = CurvedAnimation(
+      parent: _headerAnimationController,
+      curve: Curves.easeInOut,
+    );
+
+    _scrollController.addListener(_onScroll);
+    _headerAnimationController.forward();
+  }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _searchController.dispose();
+    _headerAnimationController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    final offset = _scrollController.offset;
+    final shouldHideHeader = offset > 100;
+
+    if (shouldHideHeader && _isHeaderVisible) {
+      setState(() => _isHeaderVisible = false);
+      _headerAnimationController.reverse();
+    } else if (!shouldHideHeader && !_isHeaderVisible) {
+      setState(() => _isHeaderVisible = true);
+      _headerAnimationController.forward();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
 
+    final videosAsync = _getVideosAsync();
+
     return GradientBackground(
-      child: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(context),
-            _buildCategoryFilter(),
-            Expanded(
-              child: _buildVideosList(),
-            ),
-          ],
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Animated Header
+              SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, -1),
+                  end: Offset.zero,
+                ).animate(_headerAnimation),
+                child: _buildHeader(context),
+              ),
+
+              // Search Bar (when active)
+              if (_showSearch) _buildSearchBar(),
+
+
+
+              // Category Filter
+              _buildCategoryFilter(),
+
+              // Sort Filter
+              _buildSortFilter(),
+
+              // Videos List
+              Expanded(child: _buildVideosList(videosAsync)),
+            ],
+          ),
         ),
+        floatingActionButton: _buildFloatingActionButton(),
       ),
     );
   }
@@ -51,22 +121,52 @@ class _VideosMainScreenState extends ConsumerState<VideosMainScreen>
     return FadeInDown(
       duration: const Duration(milliseconds: 600),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
-            const Icon(Icons.play_circle, color: Colors.white, size: 28),
-            const SizedBox(width: 12),
-            Text(
-              'Educational Videos',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.play_circle,
                 color: Colors.white,
-                fontWeight: FontWeight.bold,
+                size: 24,
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Farm Videos',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'Learn farming techniques',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             IconButton(
-              onPressed: () => _showSearchDialog(context),
-              icon: const Icon(Icons.search, color: Colors.white),
+              onPressed: () => setState(() => _showSearch = !_showSearch),
+              icon: Icon(
+                _showSearch ? Icons.close : Icons.search,
+                color: Colors.white,
+              ),
+            ),
+            IconButton(
+              onPressed: () => _showFilterMenu(),
+              icon: const Icon(Icons.tune, color: Colors.white),
             ),
           ],
         ),
@@ -74,305 +174,567 @@ class _VideosMainScreenState extends ConsumerState<VideosMainScreen>
     );
   }
 
+  Widget _buildSearchBar() {
+    return FadeInDown(
+      duration: const Duration(milliseconds: 300),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        child: CustomInputField(
+          controller: _searchController,
+          hint: 'Search videos...',
+          prefixIcon: const Icon(Icons.search, color: AppColors.primaryGreen),
+          onChanged: (value) {
+            setState(() => _searchQuery = value.toLowerCase());
+            ref.invalidate(searchVideosProvider);
+          },
+        ),
+      ),
+    );
+  }
+
+
   Widget _buildCategoryFilter() {
     final categories = ['All', ...AppConfig.videoCategories];
 
     return FadeInUp(
       duration: const Duration(milliseconds: 600),
-      delay: const Duration(milliseconds: 200),
+      delay: const Duration(milliseconds: 300),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: categories.map((category) {
-              final isSelected = _selectedCategory == category;
-              return Container(
-                margin: const EdgeInsets.only(right: 12),
-                child: GestureDetector(
-                  onTap: () => setState(() => _selectedCategory = category),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Categories',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.9),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: categories.map((category) {
+                  final isSelected = _selectedCategory == category;
+                  return Container(
+                    margin: const EdgeInsets.only(right: 12),
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedCategory = category),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(25),
+                          border: Border.all(
+                            color: isSelected
+                                ? Colors.transparent
+                                : Colors.white.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.white.withValues(alpha: 0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Text(
+                          category,
+                          style: TextStyle(
+                            color: isSelected
+                                ? AppColors.primaryGreen
+                                : Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSortFilter() {
+    final filters = [
+      {'key': 'recent', 'label': 'Recent', 'icon': Icons.access_time},
+      {'key': 'popular', 'label': 'Popular', 'icon': Icons.trending_up},
+      {'key': 'trending', 'label': 'Trending', 'icon': Icons.whatshot},
+    ];
+
+    return FadeInUp(
+      duration: const Duration(milliseconds: 600),
+      delay: const Duration(milliseconds: 400),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Sort by',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.9),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: filters.map((filter) {
+                final isSelected = _selectedFilter == filter['key'];
+                return Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    margin: const EdgeInsets.only(right: 8),
+                    child: GestureDetector(
+                      onTap: () => setState(
+                        () => _selectedFilter = filter['key'] as String,
+                      ),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Colors.white.withValues(alpha: 0.2)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              filter['icon'] as IconData,
+                              size: 16,
+                              color: Colors.white.withValues(alpha: 0.9),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              filter['label'] as String,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontWeight: FontWeight.w500,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideosList(AsyncValue<List<Map<String, dynamic>>> videosAsync) {
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      child: videosAsync.when(
+        data: (videos) {
+          final filteredVideos = _filterVideos(videos);
+
+          if (filteredVideos.isEmpty) {
+            return _buildEmptyState();
+          }
+
+          return RefreshIndicator(
+            onRefresh: () => _refreshVideos(),
+            color: AppColors.primaryGreen,
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.all(20),
+              itemCount: filteredVideos.length,
+              itemBuilder: (context, index) {
+                final video = filteredVideos[index];
+                return FadeInUp(
+                  duration: const Duration(milliseconds: 400),
+                  delay: Duration(milliseconds: index * 50),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: VideoCard(
+                      video: video,
+                      onTap: () => _playVideo(video),
+                      onLike: () => _toggleLikeVideo(video),
+                      onSave: () => _toggleSaveVideo(video),
+                      onShare: () => _shareVideo(video),
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+        loading: () => _buildLoadingState(),
+        error: (error, stack) => _buildErrorState(error),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: FadeIn(
+        duration: const Duration(milliseconds: 800),
+        child: Container(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGreen.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(60),
+                ),
+                child: Icon(
+                  _searchQuery.isNotEmpty || _selectedCategory != 'All'
+                      ? Icons.search_off
+                      : Icons.play_circle_outline,
+                  size: 60,
+                  color: AppColors.primaryGreen.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                _searchQuery.isNotEmpty
+                    ? 'No videos found'
+                    : _selectedCategory != 'All'
+                    ? 'No videos in this category'
+                    : 'No videos available',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _searchQuery.isNotEmpty
+                    ? 'Try searching with different keywords'
+                    : 'Check back later for new farming videos',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: Colors.grey.shade600),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(20),
+      itemCount: 6,
+      itemBuilder: (context, index) {
+        return FadeInUp(
+          duration: const Duration(milliseconds: 400),
+          delay: Duration(milliseconds: index * 100),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            child: const VideoCardShimmer(),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildErrorState(Object error) {
+    return Center(
+      child: FadeIn(
+        duration: const Duration(milliseconds: 800),
+        child: Container(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 80,
+                color: AppColors.error.withValues(alpha: 0.7),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Unable to load videos',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Please check your connection and try again',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: Colors.grey.shade600),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => _refreshVideos(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGreen,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFloatingActionButton() {
+    return FadeInUp(
+      duration: const Duration(milliseconds: 800),
+      delay: const Duration(milliseconds: 600),
+      child: FloatingActionButton(
+        onPressed: () => _scrollToTop(),
+        backgroundColor: AppColors.primaryGreen,
+        child: const Icon(Icons.keyboard_arrow_up, color: Colors.white),
+      ),
+    );
+  }
+
+  // Helper Methods
+  AsyncValue<List<Map<String, dynamic>>> _getVideosAsync() {
+    if (_searchQuery.isNotEmpty) {
+      return ref.watch(searchVideosProvider(_searchQuery));
+    }
+
+    switch (_selectedFilter) {
+      case 'popular':
+        return ref.watch(popularVideosProvider);
+      case 'trending':
+        return ref.watch(trendingVideosProvider);
+      case 'recent':
+      default:
+        return _selectedCategory == 'All'
+            ? ref.watch(allVideosProvider)
+            : ref.watch(videosByCategoryProvider(_selectedCategory));
+    }
+  }
+
+  List<Map<String, dynamic>> _filterVideos(List<Map<String, dynamic>> videos) {
+    List<Map<String, dynamic>> filtered = videos;
+
+    // Filter by category if not 'All'
+    if (_selectedCategory != 'All') {
+      filtered = filtered.where((video) {
+        final category = video['category'] as String? ?? '';
+        return category == _selectedCategory;
+      }).toList();
+    }
+
+    // Apply search filter
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered.where((video) {
+        final title = (video['title'] as String? ?? '').toLowerCase();
+        final description = (video['description'] as String? ?? '')
+            .toLowerCase();
+        final category = (video['category'] as String? ?? '').toLowerCase();
+
+        return title.contains(_searchQuery) ||
+            description.contains(_searchQuery) ||
+            category.contains(_searchQuery);
+      }).toList();
+    }
+
+    return filtered;
+  }
+
+  Future<void> _refreshVideos() async {
+    ref.invalidate(allVideosProvider);
+    ref.invalidate(popularVideosProvider);
+    ref.invalidate(trendingVideosProvider);
+    ref.invalidate(videosByCategoryProvider);
+    ref.invalidate(videoStatsProvider);
+    await Future.delayed(const Duration(seconds: 1));
+  }
+
+  void _scrollToTop() {
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  void _playVideo(Map<String, dynamic> video) {
+    final videoId = video['id'] as String;
+    context.push('/video-player/$videoId', extra: video);
+  }
+
+  void _toggleLikeVideo(Map<String, dynamic> video) {
+    final videoId = video['id'] as String;
+    ref.read(videosRepositoryProvider).likeVideo(videoId, 'current_user_id');
+  }
+
+  void _toggleSaveVideo(Map<String, dynamic> video) {
+    final videoId = video['id'] as String;
+    ref.read(videosRepositoryProvider).saveVideo(videoId, 'current_user_id');
+  }
+
+  void _shareVideo(Map<String, dynamic> video) {
+    final videoTitle = video['title'] as String? ?? 'Farming Video';
+    final videoId = video['id'] as String;
+    // Share.share('Check out this farming video: $videoTitle\nhttps://agrich.app/videos/$videoId');
+  }
+
+  void _showFilterMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.tune, color: AppColors.primaryGreen),
+                const SizedBox(width: 12),
+                Text(
+                  'Filter Videos',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Sort options
+            Text(
+              'Sort by',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            _buildFilterOption('Recent', 'recent', Icons.access_time),
+            _buildFilterOption('Popular', 'popular', Icons.trending_up),
+            _buildFilterOption('Trending', 'trending', Icons.whatshot),
+            const SizedBox(height: 20),
+            Text(
+              'Category',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: ['All', ...AppConfig.videoCategories].map((category) {
+                final isSelected = _selectedCategory == category;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() => _selectedCategory = category);
+                    Navigator.pop(context);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSelected
-                            ? Colors.transparent
-                            : Colors.white.withValues(alpha: 0.3),
-                      ),
+                          ? AppColors.primaryGreen.withValues(alpha: 0.1)
+                          : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(16),
+                      border: isSelected
+                          ? Border.all(color: AppColors.primaryGreen, width: 1)
+                          : null,
                     ),
                     child: Text(
                       category,
                       style: TextStyle(
                         color: isSelected
                             ? AppColors.primaryGreen
-                            : Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
+                            : AppColors.textPrimary,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        fontSize: 12,
                       ),
                     ),
                   ),
-                ),
-              );
-            }).toList(),
-          ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 20),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildVideosList() {
-    return FadeInUp(
-      duration: const Duration(milliseconds: 600),
-      delay: const Duration(milliseconds: 400),
-      child: Container(
-        margin: const EdgeInsets.only(top: 20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: RefreshIndicator(
-          onRefresh: () async {
-            // Refresh videos
-            await Future.delayed(const Duration(seconds: 1));
-          },
-          color: AppColors.primaryGreen,
-          child: ListView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.all(20),
-            itemCount: _getMockVideos().length,
-            itemBuilder: (context, index) {
-              final video = _getMockVideos()[index];
-              return Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                child: _buildVideoCard(video),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
+  Widget _buildFilterOption(String title, String value, IconData icon) {
+    final isSelected = _selectedFilter == value;
 
-  Widget _buildVideoCard(Map<String, dynamic> video) {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Video Thumbnail
-          Container(
-            height: 200,
-            decoration: BoxDecoration(
-              color: AppColors.primaryGreen.withValues(alpha: 0.1),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            ),
-            child: Stack(
-              children: [
-                Container(
-                  width: double.infinity,
-                  height: double.infinity,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        AppColors.primaryGreen.withValues(alpha: 0.3),
-                        AppColors.primaryGreen.withValues(alpha: 0.6),
-                      ],
-                    ),
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                  ),
-                ),
-                const Center(
-                  child: Icon(
-                    Icons.play_circle,
-                    size: 60,
-                    color: Colors.white,
-                  ),
-                ),
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.7),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      video['duration'] ?? '0:00',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Video Info
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  video['title'] ?? 'Untitled Video',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  video['description'] ?? 'No description available',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 14,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryGreen.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        video['category'] ?? 'General',
-                        style: const TextStyle(
-                          color: AppColors.primaryGreen,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '${video['views'] ?? 0} views',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Text(
-                      video['uploadDate'] ?? 'Today',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showSearchDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Search Videos'),
-        content: const TextField(
-          decoration: InputDecoration(
-            hintText: 'Enter search term...',
-            prefixIcon: Icon(Icons.search),
-            border: OutlineInputBorder(),
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(
+          icon,
+          color: isSelected ? AppColors.primaryGreen : Colors.grey.shade600,
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            color: isSelected ? AppColors.primaryGreen : AppColors.textPrimary,
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Search functionality coming soon!'),
-                  backgroundColor: AppColors.info,
-                ),
-              );
-            },
-            child: const Text('Search'),
-          ),
-        ],
+        trailing: isSelected
+            ? Icon(Icons.check, color: AppColors.primaryGreen)
+            : null,
+        onTap: () {
+          setState(() => _selectedFilter = value);
+          Navigator.pop(context);
+        },
       ),
     );
-  }
-
-  List<Map<String, dynamic>> _getMockVideos() {
-    return [
-      {
-        'title': 'Modern Irrigation Techniques for Better Yield',
-        'description': 'Learn about drip irrigation and smart watering systems that can increase your crop yield by up to 40%.',
-        'category': 'Irrigation',
-        'duration': '12:45',
-        'views': 1250,
-        'uploadDate': '2 days ago',
-      },
-      {
-        'title': 'Organic Pest Control Methods',
-        'description': 'Natural and effective ways to protect your crops without harmful chemicals.',
-        'category': 'Pest Control',
-        'duration': '8:30',
-        'views': 980,
-        'uploadDate': '1 week ago',
-      },
-      {
-        'title': 'Soil Preparation for Maximum Productivity',
-        'description': 'Essential steps to prepare your soil for the upcoming planting season.',
-        'category': 'Planting',
-        'duration': '15:20',
-        'views': 2100,
-        'uploadDate': '3 days ago',
-      },
-      {
-        'title': 'Smart Farming with Technology',
-        'description': 'How to use modern technology and sensors to optimize your farming operations.',
-        'category': 'Modern Techniques',
-        'duration': '18:45',
-        'views': 3200,
-        'uploadDate': '5 days ago',
-      },
-      {
-        'title': 'Harvesting Techniques for Better Quality',
-        'description': 'Best practices for harvesting that ensure maximum quality and shelf life.',
-        'category': 'Harvesting',
-        'duration': '10:15',
-        'views': 1540,
-        'uploadDate': '1 week ago',
-      },
-    ];
   }
 }

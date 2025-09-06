@@ -1,5 +1,3 @@
-// lib/features/main/presentation/main_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -111,10 +109,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         )).toList(),
         onTap: (index) {
           ref.read(mainScreenIndexProvider.notifier).state = index;
-          _pageController.animateToPage(
+          _pageController.jumpToPage(
             index,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
           );
         },
       ),

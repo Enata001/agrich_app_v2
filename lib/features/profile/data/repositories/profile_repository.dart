@@ -10,13 +10,13 @@ class ProfileRepository {
 
   Future<String> uploadProfilePicture(File imageFile) async {
     try {
-      // Get current user data to determine file path
       final userData = _localStorageService.getUserData();
-      if (userData == null || userData['uid'] == null) {
+      if (userData == null || userData['id'] == null) {
+
         throw Exception('No user data found');
       }
 
-      final userId = userData['uid'] as String;
+      final userId = userData['id'] as String;
       return await _firebaseService.uploadProfilePicture(imageFile, userId);
     } catch (e) {
       throw Exception('Failed to upload profile picture: $e');
@@ -25,10 +25,7 @@ class ProfileRepository {
 
   Future<void> updateProfile(String userId, Map<String, dynamic> data) async {
     try {
-      // Update in Firebase
       await _firebaseService.updateUser(userId, data);
-
-      // Update local cache
       final currentUserData = _localStorageService.getUserData();
       if (currentUserData != null) {
         currentUserData.addAll(data);

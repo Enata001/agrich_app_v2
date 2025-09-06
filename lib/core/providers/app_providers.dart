@@ -15,14 +15,15 @@ import '../router/app_router.dart';
 import '../services/local_storage_service.dart';
 import '../services/firebase_service.dart';
 import '../services/weather_service.dart';
+import '../services/chatbot_service.dart';
 import '../../features/auth/data/repositories/auth_repository.dart';
 
-// Initialize SharedPreferences
+
 final sharedPreferencesInitProvider = FutureProvider<SharedPreferences>((ref) async {
   return await SharedPreferences.getInstance();
 });
 
-// Core Services Providers
+
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   final asyncPrefs = ref.watch(sharedPreferencesInitProvider);
   return asyncPrefs.when(
@@ -59,7 +60,12 @@ final weatherServiceProvider = Provider<WeatherService>((ref) {
   return WeatherService();
 });
 
-// Repository Providers
+
+final chatbotServiceProvider = Provider<ChatbotService>((ref) {
+  return ChatbotService();
+});
+
+
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final firebaseAuth = ref.watch(firebaseAuthProvider);
   final firebaseService = ref.watch(firebaseServiceProvider);
@@ -101,12 +107,12 @@ final tipsRepositoryProvider = Provider<TipsRepository>((ref) {
   return TipsRepository(firebaseService, localStorage);
 });
 
-// Router Provider
+
 final routerProvider = Provider<GoRouter>((ref) {
   return AppRouter.router;
 });
 
-// Auth State Provider
+
 final authStateProvider = StreamProvider<User?>((ref) {
   final firebaseAuth = ref.watch(firebaseAuthProvider);
   return firebaseAuth.authStateChanges();

@@ -1,12 +1,21 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 class AppConfig {
   static const String appName = 'Agrich 2.0';
   static const String appVersion = '2.0.0';
 
-  // API Configuration
-  static const String weatherApiKey = 'fe8142801b398835cd1edf8ef9bf5f98';
-  static const String weatherBaseUrl = 'https://api.openweathermap.org/data/2.5';
 
-  // Firebase Collections
+  static String weatherApiKey = dotenv.env['WEATHER_API_KEY'] ??"";
+  static const String weatherBaseUrl =
+      'https://api.openweathermap.org/data/2.5';
+  static const String openAiBaseUrl = 'https://api.openai.com/v1';
+
+  static const String openAiApiUrl = '$openAiBaseUrl/chat/completions';
+
+  static final String openAiApiKey =dotenv.env['OPENAI_API_KEY']?? "";
+
+
+
   static const String usersCollection = 'users';
   static const String postsCollection = 'posts';
   static const String commentsCollection = 'comments';
@@ -15,13 +24,13 @@ class AppConfig {
   static const String chatsCollection = 'chats';
   static const String messagesCollection = 'messages';
 
-  // Storage Paths
+
   static const String profilePicturesPath = 'profile_pictures';
   static const String postImagesPath = 'post_images';
   static const String videoThumbnailsPath = 'video_thumbnails';
   static const String videosPath = 'videos';
 
-  // Video Categories
+
   static const List<String> videoCategories = [
     'Harvesting',
     'Spraying',
@@ -34,21 +43,21 @@ class AppConfig {
     'Crop Rotation',
   ];
 
-  // App Limits
+
   static const int maxPostLength = 500;
   static const int maxCommentLength = 200;
   static const int maxChatMessageLength = 1000;
   static const int videosPerPage = 10;
   static const int postsPerPage = 20;
 
-  // Animation Durations
+
   static const Duration fastAnimation = Duration(milliseconds: 200);
   static const Duration mediumAnimation = Duration(milliseconds: 300);
   static const Duration slowAnimation = Duration(milliseconds: 500);
 
-  // Cache Settings
+
   static const Duration cacheExpiration = Duration(hours: 24);
-  static const int maxCacheSize = 100; // MB
+  static const int maxCacheSize = 100;
 }
 
 class CacheKeys {

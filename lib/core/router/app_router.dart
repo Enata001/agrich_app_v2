@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/new_password_screen.dart';
 import '../../features/auth/presentation/phone_sign_in_screen.dart';
+import '../../features/chat/presentation/chatbot_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/auth/presentation/auth_screen.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
@@ -15,6 +16,7 @@ import '../../features/community/presentation/create_post_screen.dart';
 import '../../features/community/presentation/post_details_screen.dart';
 import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/chat/presentation/chat_list_screen.dart';
+import '../../features/weather/presentation/weather_details_screen.dart';
 import '../../index_screen.dart';
 import 'app_routes.dart';
 import 'route_transitions.dart';
@@ -26,7 +28,7 @@ class AppRouter {
     navigatorKey: _rootNavigatorKey,
     initialLocation: AppRoutes.splash,
     routes: [
-      // Splash Screen
+
       GoRoute(
         path: AppRoutes.splash,
         name: 'splash',
@@ -37,19 +39,19 @@ class AppRouter {
         ),
       ),
 
-      // Onboarding Screen
+
       GoRoute(
         path: AppRoutes.onboarding,
         name: 'onboarding',
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
           child: const OnboardingScreen(),
-          transitionsBuilder: RouteTransitions.slideTransition,
+          transitionsBuilder: RouteTransitions.slidePullBackTransition,
         ),
 
       ),
 
-      // Auth Screen
+
       GoRoute(
         path: AppRoutes.auth,
         name: 'auth',
@@ -60,14 +62,14 @@ class AppRouter {
         ),
       ),
 
-      // Forgot Password Screen
+
       GoRoute(
         path: AppRoutes.forgotPassword,
         name: 'forgot-password',
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
           child: const ForgotPasswordScreen(),
-          transitionsBuilder: RouteTransitions.slideTransition,
+          transitionsBuilder: RouteTransitions.slidePullBackTransition,
         ),
       ),
 
@@ -81,25 +83,25 @@ class AppRouter {
             child: OtpVerificationScreen(
               phoneNumber: extra['phoneNumber'] as String? ?? '',
               verificationId: extra['verificationId'] as String? ?? '',
-              verificationType: extra['verificationType'] as String?, // 🔥 NEW: Pass verification type
+              verificationType: extra['verificationType'] as String?,
             ),
             transitionsBuilder: RouteTransitions.slidePullBackTransition,
           );
         },
       ),
 
-      // Main Screen (Dashboard with Bottom Navigation)
+
       GoRoute(
         path: AppRoutes.main,
         name: 'main',
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
           child: const MainScreen(),
-          transitionsBuilder: RouteTransitions.slideTransition,
+          transitionsBuilder: RouteTransitions.slidePullBackTransition,
         ),
       ),
 
-      // Edit Profile Screen
+
       GoRoute(
         path: AppRoutes.editProfile,
         name: 'edit-profile',
@@ -110,7 +112,7 @@ class AppRouter {
         ),
       ),
 
-      // Video Player Screen
+
       GoRoute(
         path: AppRoutes.videoPlayer,
         name: 'video-player',
@@ -127,7 +129,7 @@ class AppRouter {
         },
       ),
 
-      // Videos List Screen
+
       GoRoute(
         path: AppRoutes.videosList,
         name: 'videos-list',
@@ -138,12 +140,12 @@ class AppRouter {
             child: VideosListScreen(
               category: extra['category'] as String? ?? '',
             ),
-            transitionsBuilder: RouteTransitions.slideTransition,
+            transitionsBuilder: RouteTransitions.slidePullBackTransition,
           );
         },
       ),
 
-      // Create Post Screen
+
       GoRoute(
         path: AppRoutes.createPost,
         name: 'create-post',
@@ -154,7 +156,7 @@ class AppRouter {
         ),
       ),
 
-      // Post Details Screen
+
       GoRoute(
         path: AppRoutes.postDetails,
         name: 'post-details',
@@ -163,23 +165,23 @@ class AppRouter {
           return CustomTransitionPage(
             key: state.pageKey,
             child: PostDetailsScreen(postId: extra['postId'] as String? ?? ''),
-            transitionsBuilder: RouteTransitions.slideTransition,
+            transitionsBuilder: RouteTransitions.slidePullBackTransition,
           );
         },
       ),
 
-      // Chat List Screen
+
       GoRoute(
         path: AppRoutes.chatList,
         name: 'chat-list',
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
           child: const ChatListScreen(),
-          transitionsBuilder: RouteTransitions.slideTransition,
+          transitionsBuilder: RouteTransitions.slidePullBackTransition,
         ),
       ),
 
-      // Individual Chat Screen
+
       GoRoute(
         path: AppRoutes.chat,
         name: 'chat',
@@ -190,8 +192,9 @@ class AppRouter {
             child: ChatScreen(
               chatId: extra['chatId'] as String? ?? '',
               recipientName: extra['recipientName'] as String? ?? '',
+              recipientAvatar: extra['recipientAvatar'],
             ),
-            transitionsBuilder: RouteTransitions.slideTransition,
+            transitionsBuilder: RouteTransitions.slidePullBackTransition,
           );
         },
       ),
@@ -203,7 +206,7 @@ class AppRouter {
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
           child: const PhoneSignInScreen(),
-          transitionsBuilder: RouteTransitions.slideTransition,
+          transitionsBuilder: RouteTransitions.slidePullBackTransition,
         ),
       ),
 
@@ -219,13 +222,34 @@ class AppRouter {
               phoneNumber: extra['phoneNumber'] as String? ?? '',
               verificationId: extra['verificationId'] as String?,
             ),
-            transitionsBuilder: RouteTransitions.slideTransition,
+            transitionsBuilder: RouteTransitions.slidePullBackTransition,
           );
         },
       ),
+
+      GoRoute(
+        path: AppRoutes.weatherDetails,
+        name: 'weather-details',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const WeatherDetailsScreen(),
+          transitionsBuilder: RouteTransitions.slidePullBackTransition,
+        ),
+      ),
+
+      GoRoute(
+        path: AppRoutes.chatbot,
+        name: 'chatbot',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const ChatbotScreen(),
+          transitionsBuilder: RouteTransitions.slidePullBackTransition,
+        ),
+      ),
     ],
 
-    // Error handling
+
+
     errorBuilder: (context, state) => Scaffold(
       body: Center(
         child: Column(

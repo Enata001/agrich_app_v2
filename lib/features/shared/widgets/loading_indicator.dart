@@ -208,7 +208,7 @@ class _PulsatingDotsState extends State<PulsatingDots>
 class SkeletonLoader extends StatefulWidget {
   final double width;
   final double height;
-  final BorderRadius? borderRadius;
+  final double? borderRadius;
 
   const SkeletonLoader({
     super.key,
@@ -254,7 +254,7 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
           width: widget.width,
           height: widget.height,
           decoration: BoxDecoration(
-            borderRadius: widget.borderRadius ?? BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(widget.borderRadius ?? 8),
             gradient: LinearGradient(
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
@@ -279,7 +279,7 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
 class ShimmerBox extends StatelessWidget {
   final double width;
   final double height;
-  final BorderRadius? borderRadius;
+  final double? borderRadius;
 
   const ShimmerBox({
     super.key,
@@ -311,19 +311,19 @@ class VideoShimmer extends StatelessWidget {
           ShimmerBox(
             width: double.infinity,
             height: 180,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: (12),
           ),
           const SizedBox(height: 12),
           ShimmerBox(
             width: MediaQuery.of(context).size.width * 0.7,
             height: 16,
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: (4),
           ),
           const SizedBox(height: 8),
           ShimmerBox(
             width: MediaQuery.of(context).size.width * 0.5,
             height: 14,
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: (4),
           ),
         ],
       ),
@@ -358,7 +358,7 @@ class PostShimmer extends StatelessWidget {
               ShimmerBox(
                 width: 40,
                 height: 40,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: (20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -368,13 +368,13 @@ class PostShimmer extends StatelessWidget {
                     ShimmerBox(
                       width: MediaQuery.of(context).size.width * 0.3,
                       height: 16,
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: (4),
                     ),
                     const SizedBox(height: 4),
                     ShimmerBox(
                       width: MediaQuery.of(context).size.width * 0.2,
                       height: 12,
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: (4),
                     ),
                   ],
                 ),
@@ -385,19 +385,19 @@ class PostShimmer extends StatelessWidget {
           ShimmerBox(
             width: double.infinity,
             height: 14,
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: (4),
           ),
           const SizedBox(height: 8),
           ShimmerBox(
             width: MediaQuery.of(context).size.width * 0.8,
             height: 14,
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: (4),
           ),
           const SizedBox(height: 16),
           ShimmerBox(
             width: double.infinity,
             height: 200,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: (12),
           ),
         ],
       ),

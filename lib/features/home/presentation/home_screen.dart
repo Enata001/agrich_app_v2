@@ -67,7 +67,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       duration: const Duration(milliseconds: 600),
       delay: const Duration(milliseconds: 200),
       child: Container(
-        margin: const EdgeInsets.all(20),
+        margin: const EdgeInsets.only(top: 20, bottom: 20),
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -189,6 +189,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       duration: const Duration(milliseconds: 600),
       delay: const Duration(milliseconds: 500),
       child: Container(
+
         margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

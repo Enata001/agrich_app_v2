@@ -11,7 +11,7 @@ class AppTheme {
       brightness: Brightness.light,
     ),
 
-    // App Bar Theme
+
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -28,7 +28,7 @@ class AppTheme {
       ),
     ),
 
-    // Elevated Button Theme
+
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primaryGreen,
@@ -47,7 +47,7 @@ class AppTheme {
       ),
     ),
 
-    // Text Button Theme
+
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: AppColors.primaryGreen,
@@ -60,7 +60,7 @@ class AppTheme {
       ),
     ),
 
-    // Input Decoration Theme
+
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: Colors.white,
@@ -102,7 +102,7 @@ class AppTheme {
       ),
     ),
 
-    // Card Theme
+
     cardTheme: CardThemeData(
       color: Colors.white,
       elevation: 4,
@@ -112,7 +112,7 @@ class AppTheme {
       ),
     ),
 
-    // Bottom Navigation Bar Theme
+
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: Colors.white,
       selectedItemColor: AppColors.primaryGreen,
@@ -121,7 +121,7 @@ class AppTheme {
       elevation: 8,
     ),
 
-    // Text Theme
+
     textTheme: const TextTheme(
       displayLarge: TextStyle(
         fontSize: 32,
@@ -215,7 +215,7 @@ class AppTheme {
       ),
     ),
 
-    // Scaffold Background Color
+
     scaffoldBackgroundColor: AppColors.background,
   );
 }

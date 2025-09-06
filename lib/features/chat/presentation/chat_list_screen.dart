@@ -1,3 +1,4 @@
+import 'package:agrich_app_v2/features/chat/presentation/widgets/chat_shimmer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animate_do/animate_do.dart';
@@ -12,7 +13,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../shared/widgets/custom_input_field.dart';
 import '../../shared/widgets/gradient_background.dart';
-import '../../shared/widgets/loading_indicator.dart';
 import 'providers/chat_provider.dart';
 
 class ChatListScreen extends ConsumerStatefulWidget {
@@ -24,7 +24,6 @@ class ChatListScreen extends ConsumerStatefulWidget {
 
 class _ChatListScreenState extends ConsumerState<ChatListScreen>
     with AutomaticKeepAliveClientMixin {
-
   @override
   bool get wantKeepAlive => true;
 
@@ -36,6 +35,8 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
     _searchController.dispose();
     super.dispose();
   }
+
+  bool _showSearch = false;
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +53,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
         child: Column(
           children: [
             _buildHeader(context),
-            _buildSearchBar(),
+            if (_showSearch) _buildSearchBar(),
             Expanded(
               child: userChats.when(
                 data: (chats) => _filteredChats(chats).isEmpty
@@ -72,9 +73,21 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
     return FadeInDown(
       duration: const Duration(milliseconds: 600),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
+            if (_showSearch) ...[
+          IconButton(
+          onPressed: () {
+    setState(() {
+    _showSearch = false;
+    _searchQuery = '';
+    _searchController.clear();
+    });
+    },
+      icon: const Icon(Icons.arrow_back, color: Colors.white),
+    ),
+    ] else ...[
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -108,25 +121,44 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
                 ],
               ),
             ),
-            IconButton(
-              onPressed: () {
-                // TODO: Show chat options menu
-              },
-              icon: Icon(
-                Icons.more_vert,
-                color: Colors.white.withValues(alpha: 0.8),
-              ),
+            Row(
+              children: [
+                IconButton(onPressed: () {
+                  setState(() {
+                    _showSearch = true;
+                    _searchQuery = '';
+                    _searchController.clear();
+                  });
+                }, icon: Icon(Icons.search, color: Colors.white,)),
+                GestureDetector(
+                  onTap: () => _openChatbot(context),
+                  child: Container(
+                    padding: EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.smart_toy,
+                      color: Colors.white,
+                      size: 26,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
+    ],
         ),
       ),
     );
   }
 
   Widget _buildSearchBar() {
-    return FadeInUp(
-      duration: const Duration(milliseconds: 600),
-      delay: const Duration(milliseconds: 200),
+    return FadeInDown(
+      duration: const Duration(milliseconds: 400),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 20),
         child: CustomInputField(
@@ -143,7 +175,10 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
     );
   }
 
-  Widget _buildChatsList(BuildContext context, List<Map<String, dynamic>> chats) {
+  Widget _buildChatsList(
+    BuildContext context,
+    List<Map<String, dynamic>> chats,
+  ) {
     return RefreshIndicator(
       onRefresh: () async {
         final currentUser = ref.read(currentUserProvider);
@@ -200,21 +235,23 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
               children: [
                 CircleAvatar(
                   radius: 28,
-                  backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.2),
+                  backgroundColor: AppColors.primaryGreen.withValues(
+                    alpha: 0.2,
+                  ),
                   backgroundImage: recipientAvatar.isNotEmpty
                       ? CachedNetworkImageProvider(recipientAvatar)
                       : null,
                   child: recipientAvatar.isEmpty
                       ? Text(
-                    recipientName.isNotEmpty
-                        ? recipientName[0].toUpperCase()
-                        : 'U',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primaryGreen,
-                    ),
-                  )
+                          recipientName.isNotEmpty
+                              ? recipientName[0].toUpperCase()
+                              : 'U',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryGreen,
+                          ),
+                        )
                       : null,
                 ),
                 if (isOnline)
@@ -243,19 +280,19 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
                       Expanded(
                         child: Text(
                           recipientName,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (lastMessageTime != null)
                         Text(
                           timeago.format(lastMessageTime),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.textSecondary),
                         ),
                     ],
                   ),
@@ -267,34 +304,35 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
                           lastMessage.isNotEmpty
                               ? lastMessage
                               : 'Start a conversation',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: lastMessage.isNotEmpty
-                                ? AppColors.textSecondary
-                                : AppColors.textTertiary,
-                            fontStyle: lastMessage.isEmpty
-                                ? FontStyle.italic
-                                : FontStyle.normal,
-                          ),
-                          maxLines: 1,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: lastMessage.isNotEmpty
+                                    ? AppColors.textSecondary
+                                    : AppColors.textTertiary,
+                                fontStyle: lastMessage.isEmpty
+                                    ? FontStyle.italic
+                                    : FontStyle.normal,
+                              ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (unreadCount > 0)
                         Container(
+                          margin: const EdgeInsets.only(left: 8),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
                             color: AppColors.primaryGreen,
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             unreadCount > 99 ? '99+' : unreadCount.toString(),
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
@@ -307,6 +345,30 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
         ),
       ),
     );
+  }
+
+  Widget _buildFloatingActionButton(BuildContext context) {
+    return FadeInUp(
+      duration: const Duration(milliseconds: 800),
+      delay: const Duration(milliseconds: 400),
+      child: FloatingActionButton(
+        onPressed: () => _startNewChat(context),
+        backgroundColor: AppColors.primaryGreen,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _filteredChats(List<Map<String, dynamic>> chats) {
+    if (_searchQuery.isEmpty) return chats;
+
+    return chats.where((chat) {
+      final recipientName = (chat['recipientName'] as String? ?? '')
+          .toLowerCase();
+      final lastMessage = (chat['lastMessage'] as String? ?? '').toLowerCase();
+      return recipientName.contains(_searchQuery) ||
+          lastMessage.contains(_searchQuery);
+    }).toList();
   }
 
   Widget _buildEmptyState(BuildContext context) {
@@ -341,24 +403,44 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
               ),
               const SizedBox(height: 12),
               Text(
-                'Start connecting with fellow farmers in the community to begin chatting!',
+                'Start chatting with fellow farmers or try our AI assistant for farming advice',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Colors.white.withValues(alpha: 0.8),
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: () => _startNewChat(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: AppColors.primaryGreen,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
+              Column(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () => _startNewChat(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppColors.primaryGreen,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                    ),
+                    icon: const Icon(Icons.person_add),
+                    label: const Text('Start Chat'),
                   ),
-                ),
-                child: const Text('Start Chatting'),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () => _openChatbot(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryGreen,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                    ),
+                    icon: const Icon(Icons.smart_toy),
+                    label: const Text('AI Assistant'),
+                  ),
+                ],
               ),
             ],
           ),
@@ -438,95 +520,94 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
                     vertical: 12,
                   ),
                 ),
-                child: const Text('Try Again'),
+                child: const Text('Retry'),
               ),
             ],
           ),
         ),
       ),
     );
-  }
-
-  Widget _buildFloatingActionButton(BuildContext context) {
-    return FadeInUp(
-      duration: const Duration(milliseconds: 800),
-      delay: const Duration(milliseconds: 400),
-      child: FloatingActionButton(
-        onPressed: () => _startNewChat(context),
-        backgroundColor: AppColors.primaryGreen,
-        foregroundColor: Colors.white,
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-
-  List<Map<String, dynamic>> _filteredChats(List<Map<String, dynamic>> chats) {
-    if (_searchQuery.isEmpty) return chats;
-
-    return chats.where((chat) {
-      final recipientName = (chat['recipientName'] as String? ?? '').toLowerCase();
-      final lastMessage = (chat['lastMessage'] as String? ?? '').toLowerCase();
-
-      return recipientName.contains(_searchQuery) ||
-          lastMessage.contains(_searchQuery);
-    }).toList();
   }
 
   void _openChat(BuildContext context, Map<String, dynamic> chat) {
     context.push(
-      AppRoutes.chat,
+      '${AppRoutes.chat}/${chat['recipientId']}',
       extra: {
-        'chatId': chat['id'] ?? '',
-        'recipientName': chat['recipientName'] ?? '',
-        'recipientAvatar': chat['recipientAvatar'] ?? '',
+        'recipientName': chat['recipientName'],
+        'recipientAvatar': chat['recipientAvatar'],
       },
     );
   }
 
+  void _openChatbot(BuildContext context) {
+    context.push('/chatbot');
+  }
 
-    void _startNewChat(BuildContext context) {
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (context) => Container(
-          height: MediaQuery.of(context).size.height * 0.75,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  children: [
-                    Text(
-                      'Start New Chat',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: _buildUserSearchList(context),
-              ),
-            ],
-          ),
+  // List<Map<String, dynamic>> _filteredChats(List<Map<String, dynamic>> chats) {
+  //   if (_searchQuery.isEmpty) return chats;
+  //
+  //   return chats.where((chat) {
+  //     final recipientName = (chat['recipientName'] as String? ?? '').toLowerCase();
+  //     final lastMessage = (chat['lastMessage'] as String? ?? '').toLowerCase();
+  //
+  //     return recipientName.contains(_searchQuery) ||
+  //         lastMessage.contains(_searchQuery);
+  //   }).toList();
+  // }
+
+  // void _openChat(BuildContext context, Map<String, dynamic> chat) {
+  //   context.push(
+  //     AppRoutes.chat,
+  //     extra: {
+  //       'chatId': chat['id'] ?? '',
+  //       'recipientName': chat['recipientName'] ?? '',
+  //       'recipientAvatar': chat['recipientAvatar'] ?? '',
+  //     },
+  //   );
+  // }
+
+  void _startNewChat(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.75,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-      );
-    }
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Text(
+                    'Start New Chat',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(child: _buildUserSearchList(context)),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildUserSearchList(BuildContext context) {
     return FutureBuilder<List<Map<String, dynamic>>>(
-      future: ref.read(chatRepositoryProvider).searchUsers(''), // Empty query to get all users
+      future: ref.read(chatRepositoryProvider).searchUsers(''),
+      // Empty query to get all users
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -534,7 +615,9 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
 
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const Center(
-            child: Text('No users found. Users will appear here when they join the community.'),
+            child: Text(
+              'No users found. Users will appear here when they join the community.',
+            ),
           );
         }
 
@@ -542,7 +625,9 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
         final currentUser = ref.read(currentUserProvider);
 
         // Filter out current user
-        final otherUsers = users.where((user) => user['id'] != currentUser?.uid).toList();
+        final otherUsers = users
+            .where((user) => user['id'] != currentUser?.uid)
+            .toList();
 
         return ListView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -564,17 +649,20 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
                 Navigator.pop(context);
                 if (currentUser != null) {
                   try {
-                    final chatId = await ref.read(chatRepositoryProvider).createOrGetChat([
-                      currentUser.uid,
-                      user['id'],
-                    ]);
+                    final chatId = await ref
+                        .read(chatRepositoryProvider)
+                        .createOrGetChat([currentUser.uid, user['id']]);
 
                     if (mounted) {
-                      context.push(AppRoutes.chat, extra: {
-                        'chatId': chatId,
-                        'recipientName': user['displayName'] ?? 'Unknown User',
-                        'recipientAvatar': user['photoURL'] ?? '',
-                      });
+                      context.push(
+                        AppRoutes.chat,
+                        extra: {
+                          'chatId': chatId,
+                          'recipientName':
+                              user['displayName'] ?? 'Unknown User',
+                          'recipientAvatar': user['photoURL'] ?? '',
+                        },
+                      );
                     }
                   } catch (e) {
                     if (mounted) {
@@ -589,63 +677,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
           },
         );
       },
-    );
-  }
-
-}
-
-class ChatShimmer extends StatelessWidget {
-  const ChatShimmer({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          const ShimmerBox(width: 56, height: 56, borderRadius: BorderRadius.all(Radius.circular(28))),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    ShimmerBox(
-                      width: MediaQuery.of(context).size.width * 0.3,
-                      height: 16,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    const Spacer(),
-                    ShimmerBox(
-                      width: MediaQuery.of(context).size.width * 0.15,
-                      height: 12,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                ShimmerBox(
-                  width: MediaQuery.of(context).size.width * 0.6,
-                  height: 14,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

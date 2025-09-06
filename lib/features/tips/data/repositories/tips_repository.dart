@@ -1,5 +1,3 @@
-// lib/features/tips/data/repositories/tips_repository.dart
-
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/services/firebase_service.dart';
@@ -12,10 +10,10 @@ class TipsRepository {
 
   TipsRepository(this._firebaseService, this._localStorageService);
 
-  // Get daily tip - ENHANCED with real Firebase integration
+  
   Future<Map<String, dynamic>> getDailyTip() async {
     try {
-      // Check if we have today's tip cached
+      
       final cachedTip = _localStorageService.getDailyTip();
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
@@ -23,37 +21,37 @@ class TipsRepository {
         return cachedTip;
       }
 
-      // Try to get today's featured tip from Firebase
+      
       final featuredTip = await _getTodaysFeaturedTip();
       if (featuredTip != null) {
         await _localStorageService.setDailyTip(featuredTip);
         return featuredTip;
       }
 
-      // Get a random high-priority tip
+      
       final randomTip = await _getRandomTip();
       if (randomTip != null) {
         await _localStorageService.setDailyTip(randomTip);
         return randomTip;
       }
 
-      // Create and return default tip if no tips exist
+      
       final defaultTip = await _createDefaultTip();
       await _localStorageService.setDailyTip(defaultTip);
       return defaultTip;
     } catch (e) {
-      // Return cached tip if available
+      
       final cachedTip = _localStorageService.getDailyTip();
       if (cachedTip != null) {
         return cachedTip;
       }
 
-      // Return default tip as fallback
+      
       return _getDefaultTipData();
     }
   }
 
-  // Get all tips - NEW IMPLEMENTATION with real-time updates
+  
   Stream<List<Map<String, dynamic>>> getAllTips() {
     try {
       return _firebaseService.listenToCollection(
@@ -78,7 +76,23 @@ class TipsRepository {
     }
   }
 
-  // Get tips by category - NEW IMPLEMENTATION
+
+  Future<bool> isTipLiked(String tipId, String userId) async {
+    try {
+      final doc = await _firebaseService.getTip(tipId);
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        final likedBy = List<String>.from(data['likedBy'] ?? []);
+        return likedBy.contains(userId);
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+
+
   Stream<List<Map<String, dynamic>>> getTipsByCategory(String category) {
     try {
       return _firebaseService.listenToCollection(
@@ -102,7 +116,7 @@ class TipsRepository {
     }
   }
 
-  // Save/bookmark a tip - NEW IMPLEMENTATION
+  
   Future<void> saveTip(String tipId, String userId) async {
     try {
       final savedTips = await _firebaseService.getSavedTips(userId);
@@ -110,15 +124,15 @@ class TipsRepository {
       (doc.data() as Map<String, dynamic>)['tipId'] == tipId);
 
       if (alreadySaved) {
-        // Unsave - find and delete the saved tip document
+        
         final savedTipDoc = savedTips.docs.firstWhere((doc) =>
         (doc.data() as Map<String, dynamic>)['tipId'] == tipId);
         await _firebaseService.unsaveTip(savedTipDoc.id);
       } else {
-        // Save
+        
         await _firebaseService.saveTip(userId, tipId);
 
-        // Update tip save count
+        
         await _incrementTipSaveCount(tipId);
       }
     } catch (e) {
@@ -126,7 +140,7 @@ class TipsRepository {
     }
   }
 
-  // Check if tip is saved - NEW IMPLEMENTATION
+  
   Future<bool> isTipSaved(String tipId, String userId) async {
     try {
       final savedTips = await _firebaseService.getSavedTips(userId);
@@ -137,11 +151,30 @@ class TipsRepository {
     }
   }
 
-  // Get user's saved tips - NEW IMPLEMENTATION
+  Future<Map<String, dynamic>?> getTipDetails(String tipId) async {
+    try {
+      final doc = await _firebaseService.getTip(tipId);
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        return {
+          'id': doc.id,
+          ...data,
+          'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          'updatedAt': (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        };
+      }
+      return null;
+    } catch (e) {
+      print('Error getting tip details for $tipId: $e');
+      return null;
+    }
+  }
+
+  
   Stream<List<Map<String, dynamic>>> getUserSavedTips(String userId) {
     try {
       return _firebaseService.listenToCollection(
-        'saved_tips', // Assuming this collection exists
+        'saved_tips', 
         where: {'userId': userId},
         orderBy: 'createdAt',
         descending: true,
@@ -167,7 +200,7 @@ class TipsRepository {
               }
             }
           } catch (e) {
-            // Skip tips that can't be loaded
+            
           }
         }
 
@@ -178,7 +211,7 @@ class TipsRepository {
     }
   }
 
-  // Like a tip - NEW IMPLEMENTATION
+  
   Future<void> likeTip(String tipId, String userId) async {
     try {
       final tipDoc = await _firebaseService.getTip(tipId);
@@ -189,14 +222,14 @@ class TipsRepository {
       final currentLikesCount = data['likesCount'] as int? ?? 0;
 
       if (likedBy.contains(userId)) {
-        // Unlike
+        
         likedBy.remove(userId);
         await _firebaseService.updateTip(tipId, {
           'likedBy': likedBy,
           'likesCount': currentLikesCount - 1,
         });
       } else {
-        // Like
+        
         likedBy.add(userId);
         await _firebaseService.updateTip(tipId, {
           'likedBy': likedBy,
@@ -208,14 +241,14 @@ class TipsRepository {
     }
   }
 
-  // Rate a tip - NEW IMPLEMENTATION
+  
   Future<void> rateTip(String tipId, int rating, String userId) async {
     try {
       if (rating < 1 || rating > 5) {
         throw Exception('Rating must be between 1 and 5');
       }
 
-      // Store rating in subcollection
+      
       await FirebaseFirestore.instance
           .collection(AppConfig.tipsCollection)
           .doc(tipId)
@@ -228,14 +261,14 @@ class TipsRepository {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      // Update tip's average rating
+      
       await _updateTipAverageRating(tipId);
     } catch (e) {
       throw Exception('Failed to rate tip: $e');
     }
   }
 
-  // Get tip categories - NEW IMPLEMENTATION
+  
   Future<List<String>> getTipCategories() async {
     try {
       final snapshot = await FirebaseFirestore.instance
@@ -259,7 +292,7 @@ class TipsRepository {
     }
   }
 
-  // Search tips - NEW IMPLEMENTATION
+  
   Future<List<Map<String, dynamic>>> searchTips(String query) async {
     try {
       if (query.isEmpty) return [];
@@ -286,7 +319,7 @@ class TipsRepository {
     }
   }
 
-  // Initialize default tips if database is empty - NEW IMPLEMENTATION
+  
   Future<void> initializeDefaultTips() async {
     try {
       final tipsCount = await FirebaseFirestore.instance
@@ -303,7 +336,7 @@ class TipsRepository {
     }
   }
 
-  // Increment tip view count - NEW IMPLEMENTATION
+  
   Future<void> incrementViewCount(String tipId) async {
     try {
       await _firebaseService.updateTip(tipId, {
@@ -311,12 +344,12 @@ class TipsRepository {
         'lastViewedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      // View count increment failure shouldn't block the app
+      
       print('Failed to increment view count: $e');
     }
   }
 
-  // Get user tip stats - NEW IMPLEMENTATION
+  
   Future<Map<String, int>> getUserTipStats(String userId) async {
     try {
       final savedTipsSnapshot = await FirebaseFirestore.instance
@@ -327,7 +360,7 @@ class TipsRepository {
 
       return {
         'savedTips': savedTipsSnapshot.count ?? 0,
-        'likedTips': 0, // TODO: Implement if needed
+        'likedTips': 0, 
       };
     } catch (e) {
       return {
@@ -337,7 +370,7 @@ class TipsRepository {
     }
   }
 
-  // Get tips history - UPDATED to use Firebase
+  
   Future<List<Map<String, dynamic>>> getTipsHistory() async {
     try {
       final snapshot = await _firebaseService.getTips();
@@ -362,7 +395,7 @@ class TipsRepository {
     }
   }
 
-  // Private helper methods
+  
   Future<Map<String, dynamic>?> _getTodaysFeaturedTip() async {
     try {
       final today = DateTime.now();
@@ -440,7 +473,7 @@ class TipsRepository {
       'isActive': true,
     };
 
-    // Save to Firebase
+    
     try {
       final docRef = await _firebaseService.createTip(defaultTipData);
       return _formatTipData(docRef.id, defaultTipData);
@@ -546,7 +579,7 @@ class TipsRepository {
     for (int i = 0; i < defaultTips.length; i++) {
       final tipData = defaultTips[i];
 
-      // Generate search terms
+      
       final tags = tipData['tags'] as List<dynamic>? ?? [];
       final tagsString = tags.map((tag) => tag.toString()).join(' ');
       final searchTerms = _generateSearchTerms(
@@ -672,7 +705,7 @@ class TipsRepository {
 
     for (final word in words) {
       searchTerms.add(word);
-      // Add partial matches for longer words
+      
       if (word.length > 4) {
         for (int i = 3; i <= word.length; i++) {
           searchTerms.add(word.substring(0, i));
@@ -689,7 +722,7 @@ class TipsRepository {
         'saveCount': FieldValue.increment(1),
       });
     } catch (e) {
-      // Save count increment failure shouldn't block the app
+      
     }
   }
 

@@ -5,17 +5,17 @@ import 'package:flutter/material.dart';
 class LocationService {
   static Future<LocationPermissionResult> requestLocationPermission() async {
     try {
-      // Check if location services are enabled
+
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         return LocationPermissionResult.serviceDisabled;
       }
 
-      // Check current permission status
+
       LocationPermission permission = await Geolocator.checkPermission();
 
       if (permission == LocationPermission.denied) {
-        // Request permission
+
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
           return LocationPermissionResult.denied;

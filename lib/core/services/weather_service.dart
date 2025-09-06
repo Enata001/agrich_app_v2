@@ -11,7 +11,7 @@ class WeatherService {
     _dio.options.connectTimeout = const Duration(seconds: 10);
     _dio.options.receiveTimeout = const Duration(seconds: 10);
 
-    // Add interceptor for debugging (optional)
+
     _dio.interceptors.add(LogInterceptor(
       requestBody: false,
       responseBody: false,
@@ -64,7 +64,7 @@ class WeatherService {
       Map<String, dynamic> queryParameters = {
         'appid': AppConfig.weatherApiKey,
         'units': 'metric',
-        'cnt': days * 8, // 8 forecasts per day (every 3 hours)
+        'cnt': days * 8,
       };
 
       if (lat != null && lon != null) {
@@ -105,7 +105,7 @@ class WeatherService {
         days: days,
       );
 
-      // Group by day and get daily averages
+
       Map<String, List<Map<String, dynamic>>> groupedByDay = {};
 
       for (final forecast in hourlyForecast) {
@@ -118,7 +118,7 @@ class WeatherService {
         groupedByDay[dayKey]!.add(forecast);
       }
 
-      // Calculate daily averages
+
       List<Map<String, dynamic>> dailyForecast = [];
 
       for (final entry in groupedByDay.entries) {
@@ -138,7 +138,7 @@ class WeatherService {
     return await getCurrentWeather(cityName: cityName);
   }
 
-  // Weather alerts (requires One Call API - different endpoint)
+
   Future<List<Map<String, dynamic>>> getWeatherAlerts({
     required double lat,
     required double lon,
@@ -159,7 +159,7 @@ class WeatherService {
       }
       return [];
     } catch (e) {
-      return []; // Return empty list if alerts can't be fetched
+      return [];
     }
   }
 
