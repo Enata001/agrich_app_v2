@@ -101,43 +101,13 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
                   width: 150,
                   height: 150,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
+                    color: AppColors.borderDark.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                 ),
               ),
 
-              // Tap indicator
-              Positioned(
-                top: 16,
-                right: 16,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.touch_app,
-                        color: Colors.white.withValues(alpha: 0.8),
-                        size: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Tap for details',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+
 
               // Main content
               Padding(

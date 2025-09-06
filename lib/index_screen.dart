@@ -133,8 +133,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                 },
               ),
 
-              const SizedBox(height: 40),
-
 
               AnimatedBuilder(
                 animation: _textAnimation,
@@ -144,17 +142,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                     child: Column(
                       children: [
                         Text(
-                          'Agrich 2.0',
+                          'Agrich',
                           style: Theme.of(context).textTheme.displayMedium?.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 2,
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 4),
                         Text(
-                          'Modern Agricultural Learning',
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          'Modern Agricultural Platform',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Colors.white.withValues(alpha: 0.9),
                             letterSpacing: 1,
                           ),

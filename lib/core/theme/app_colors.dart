@@ -49,8 +49,8 @@ class AppColors {
     begin: Alignment.topCenter,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFF0C6F08),
-      Color(0xFFFFF8F8),
+      primaryGreen,
+      surface,
     ],
   );
 

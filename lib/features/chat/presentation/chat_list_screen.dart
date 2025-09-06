@@ -352,6 +352,8 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
       duration: const Duration(milliseconds: 800),
       delay: const Duration(milliseconds: 400),
       child: FloatingActionButton(
+        heroTag: UniqueKey(),
+        key: Key('/chat'),
         onPressed: () => _startNewChat(context),
         backgroundColor: AppColors.primaryGreen,
         child: const Icon(Icons.add, color: Colors.white),

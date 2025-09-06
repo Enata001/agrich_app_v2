@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -9,9 +11,10 @@ import 'core/app/app.dart';
 import 'firebase_options.dart';
 
 void main() async {
-  await dotenv.load(fileName: ".env");
-
   WidgetsFlutterBinding.ensureInitialized();
+
+  await dotenv.load();
+
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,

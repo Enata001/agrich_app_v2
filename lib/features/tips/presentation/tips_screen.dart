@@ -127,7 +127,7 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
     return FadeInDown(
       duration: const Duration(milliseconds: 600),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
             Container(
