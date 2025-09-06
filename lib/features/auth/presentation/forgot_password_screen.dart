@@ -598,7 +598,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
                     'verificationId': verificationId,
                     'phoneNumber': _fullPhoneNumber,
                     'resendToken': resendToken,
-                    'isPasswordReset': true, // Flag for password reset flow
+                    'verificationType': 'passwordReset',
                   },
                 );
               });

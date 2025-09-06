@@ -428,14 +428,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   Future<void> _handleSignUp() async {
     if (!_signUpFormKey.currentState!.validate()) return;
 
-
-
     setState(() => _isSignUpLoading = true);
 
     try {
       final authMethods = ref.read(authMethodsProvider);
-      // final number = _signUpPhoneController.text;
-      // print("Final number: $number"); // already in E.164 format
 
       // Step 1: Create account with email/password
       await authMethods.signUpWithEmailAndPassword(
@@ -450,17 +446,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
         await authMethods.verifyPhoneNumber(
           phoneNumber: _fullPhoneNumber,
           verificationCompleted: (PhoneAuthCredential credential) async {
-            // Auto verification completed
+            // 🔥 FIXED: Use credential directly for auto-verification
             try {
-              await authMethods.linkPhoneToEmailAccount(
-                _signUpPhoneController.text.trim(),
-                '', // No verification ID needed for auto-verification
-                '', // No SMS code needed for auto-verification
-              );
+              await authMethods.linkPhoneCredentialToEmailAccount(credential);
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Phone number verified automatically!'),
+                    content: Text('Phone number verified and linked automatically!'),
                     backgroundColor: AppColors.success,
                   ),
                 );
@@ -488,21 +480,23 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
             }
           },
           codeSent: (String verificationId, int? resendToken) {
-            // SMS code sent - now navigate to OTP screen
+            // 🔥 FIXED: Navigate to OTP screen with proper context
             if (mounted) {
               context.push(
                 AppRoutes.otpVerification,
                 extra: {
                   'verificationId': verificationId,
-                  'phoneNumber': _signUpPhoneController.text.trim(),
+                  'phoneNumber': _fullPhoneNumber, // Use full phone number
                   'resendToken': resendToken,
-                  'isSignUp': true, // Flag for phone linking after sign-up
+                  'isSignUp': true,
+                  'verificationType': 'linkToAccount', // 🔥 NEW: Specify verification type
                 },
               );
             }
           },
           codeAutoRetrievalTimeout: (String verificationId) {
             // Handle timeout if needed
+            print('Auto retrieval timeout for verification ID: $verificationId');
           },
         );
       }

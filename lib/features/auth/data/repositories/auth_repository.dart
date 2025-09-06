@@ -67,7 +67,35 @@ class AuthRepository {
     }
   }
 
-  // YOUR LOGIC: Link phone to existing email account after OTP verification
+  Future<void> linkPhoneCredentialToEmailAccount(PhoneAuthCredential phoneCredential) async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user == null) throw Exception('No user signed in to link phone');
+
+      // Check if phone provider is already linked
+      final isPhoneLinked = user.providerData.any((provider) => provider.providerId == 'phone');
+      if (isPhoneLinked) {
+        throw Exception('Phone number is already linked to this account');
+      }
+
+      // Link phone credential to current email account
+      await user.linkWithCredential(phoneCredential);
+
+      // Update user profile to mark phone as verified
+      await updateUserProfile(user.uid, {
+        'isPhoneVerified': true,
+        'phoneNumber': user.phoneNumber, // Firebase sets this after linking
+      });
+
+      // Update cached data
+      await _cacheUserData(user);
+      await _syncUserProfile(user);
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
+  // 🔥 FIXED: OTP-based phone linking
   Future<void> linkPhoneToEmailAccount(
       String phoneNumber,
       String verificationId,
@@ -76,6 +104,12 @@ class AuthRepository {
     try {
       final user = _firebaseAuth.currentUser;
       if (user == null) throw Exception('No user signed in to link phone');
+
+      // Check if phone provider is already linked
+      final isPhoneLinked = user.providerData.any((provider) => provider.providerId == 'phone');
+      if (isPhoneLinked) {
+        throw Exception('Phone number is already linked to this account');
+      }
 
       // Create phone credential from OTP
       final phoneCredential = PhoneAuthProvider.credential(
@@ -99,6 +133,24 @@ class AuthRepository {
       throw _handleAuthException(e);
     }
   }
+
+  // 🔥 NEW: Check if phone is already linked
+  bool isPhoneLinked() {
+    final user = _firebaseAuth.currentUser;
+    if (user == null) return false;
+
+    return user.providerData.any((provider) => provider.providerId == 'phone');
+  }
+
+  // 🔥 NEW: Get linked providers
+  List<String> getLinkedProviders() {
+    final user = _firebaseAuth.currentUser;
+    if (user == null) return [];
+
+    return user.providerData.map((provider) => provider.providerId).toList();
+  }
+
+
 
   // YOUR LOGIC: Detect if identifier is email or phone and check existence
   Future<SignInMethod> detectSignInMethod(String identifier) async {

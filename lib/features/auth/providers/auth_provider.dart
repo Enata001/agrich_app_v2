@@ -114,26 +114,24 @@ class PhoneVerificationNotifier extends StateNotifier<PhoneVerificationState> {
 
   PhoneVerificationNotifier(this._authRepository) : super(const PhoneVerificationState());
 
-  // YOUR LOGIC: Start phone verification based on purpose
-  Future<void> startPhoneVerification(
-      String phoneNumber,
-      PhoneVerificationType type,
-      ) async {
-    state = state.copyWith(
-      isLoading: true,
-      error: null,
-      phoneNumber: phoneNumber,
-      step: PhoneVerificationStep.initial,
-      type: type,
-    );
-
+  void _onVerificationCompleted(PhoneAuthCredential credential) async {
     try {
-      await _authRepository.verifyPhoneNumber(
-        phoneNumber: phoneNumber,
-        verificationCompleted: _onVerificationCompleted,
-        verificationFailed: _onVerificationFailed,
-        codeSent: _onCodeSent,
-        codeAutoRetrievalTimeout: _onCodeAutoRetrievalTimeout,
+      switch (state.type) {
+        case PhoneVerificationType.signIn:
+          await _authRepository.signInWithPhoneCredential(credential);
+          break;
+        case PhoneVerificationType.linkToAccount:
+        // 🔥 FIXED: Use the credential directly for linking
+          await _authRepository.linkPhoneCredentialToEmailAccount(credential);
+          break;
+        case PhoneVerificationType.passwordReset:
+        // Auto-verification for password reset
+          break;
+      }
+
+      state = state.copyWith(
+        isLoading: false,
+        step: PhoneVerificationStep.verified,
       );
     } catch (e) {
       state = state.copyWith(
@@ -144,7 +142,7 @@ class PhoneVerificationNotifier extends StateNotifier<PhoneVerificationState> {
     }
   }
 
-  // YOUR LOGIC: Verify OTP based on purpose
+  // 🔥 FIXED: OTP verification handling
   Future<void> verifyOtp(String otp) async {
     if (state.verificationId == null) {
       state = state.copyWith(error: 'No verification ID available');
@@ -160,7 +158,6 @@ class PhoneVerificationNotifier extends StateNotifier<PhoneVerificationState> {
     try {
       switch (state.type) {
         case PhoneVerificationType.signIn:
-        // Direct phone sign-in
           await _authRepository.signInWithPhoneOTP(
             state.phoneNumber!,
             state.verificationId!,
@@ -168,7 +165,7 @@ class PhoneVerificationNotifier extends StateNotifier<PhoneVerificationState> {
           );
           break;
         case PhoneVerificationType.linkToAccount:
-        // Link phone to existing email account
+        // 🔥 FIXED: Use proper OTP linking method
           await _authRepository.linkPhoneToEmailAccount(
             state.phoneNumber!,
             state.verificationId!,
@@ -177,7 +174,6 @@ class PhoneVerificationNotifier extends StateNotifier<PhoneVerificationState> {
           break;
         case PhoneVerificationType.passwordReset:
         // For password reset, verification success leads to new password screen
-        // The actual password reset happens in NewPasswordScreen
           break;
       }
 
@@ -200,31 +196,26 @@ class PhoneVerificationNotifier extends StateNotifier<PhoneVerificationState> {
     }
   }
 
-  void _onVerificationCompleted(PhoneAuthCredential credential) async {
-    try {
-      switch (state.type) {
-        case PhoneVerificationType.signIn:
-          await _authRepository.signInWithPhoneCredential(credential);
-          break;
-        case PhoneVerificationType.linkToAccount:
-        // Auto-verification for linking (rare but possible)
-          final user = FirebaseAuth.instance.currentUser;
-          if (user != null) {
-            await user.linkWithCredential(credential);
-            await _authRepository.updateUserProfile(user.uid, {
-              'isPhoneVerified': true,
-              'phoneNumber': state.phoneNumber,
-            });
-          }
-          break;
-        case PhoneVerificationType.passwordReset:
-        // Auto-verification for password reset
-          break;
-      }
 
-      state = state.copyWith(
-        isLoading: false,
-        step: PhoneVerificationStep.verified,
+  Future<void> startPhoneVerification(
+      String phoneNumber,
+      PhoneVerificationType type,
+      ) async {
+    state = state.copyWith(
+      isLoading: true,
+      error: null,
+      phoneNumber: phoneNumber,
+      step: PhoneVerificationStep.initial,
+      type: type,
+    );
+
+    try {
+      await _authRepository.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        verificationCompleted: _onVerificationCompleted,
+        verificationFailed: _onVerificationFailed,
+        codeSent: _onCodeSent,
+        codeAutoRetrievalTimeout: _onCodeAutoRetrievalTimeout,
       );
     } catch (e) {
       state = state.copyWith(
@@ -284,6 +275,9 @@ class AuthMethods {
 
   AuthMethods(this._authRepository);
 
+
+
+
   // YOUR LOGIC: Sign up with email/password (keeps existing method name)
   Future<UserCredential> signUpWithEmailAndPassword(
       String email,
@@ -299,13 +293,26 @@ class AuthMethods {
     );
   }
 
-  // YOUR LOGIC: Link phone to email account after sign-up
+
+  Future<void> linkPhoneCredentialToEmailAccount(PhoneAuthCredential phoneCredential) async {
+    await _authRepository.linkPhoneCredentialToEmailAccount(phoneCredential);
+  }
+
   Future<void> linkPhoneToEmailAccount(
       String phoneNumber,
       String verificationId,
       String smsCode,
       ) async {
     await _authRepository.linkPhoneToEmailAccount(phoneNumber, verificationId, smsCode);
+  }
+
+  // 🔥 NEW: Helper methods
+  bool isPhoneLinked() {
+    return _authRepository.isPhoneLinked();
+  }
+
+  List<String> getLinkedProviders() {
+    return _authRepository.getLinkedProviders();
   }
 
   // YOUR LOGIC: Detect if identifier is email or phone

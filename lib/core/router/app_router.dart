@@ -71,7 +71,6 @@ class AppRouter {
         ),
       ),
 
-      // OTP Verification Screen
       GoRoute(
         path: AppRoutes.otpVerification,
         name: 'otp-verification',
@@ -82,6 +81,7 @@ class AppRouter {
             child: OtpVerificationScreen(
               phoneNumber: extra['phoneNumber'] as String? ?? '',
               verificationId: extra['verificationId'] as String? ?? '',
+              verificationType: extra['verificationType'] as String?, // 🔥 NEW: Pass verification type
             ),
             transitionsBuilder: RouteTransitions.slidePullBackTransition,
           );
@@ -207,6 +207,7 @@ class AppRouter {
         ),
       ),
 
+
       GoRoute(
         path: AppRoutes.newPassword,
         name: 'new-password',
@@ -215,7 +216,7 @@ class AppRouter {
           return CustomTransitionPage(
             key: state.pageKey,
             child: NewPasswordScreen(
-              phoneNumber: extra['phoneNumber'] as String,
+              phoneNumber: extra['phoneNumber'] as String? ?? '',
               verificationId: extra['verificationId'] as String?,
             ),
             transitionsBuilder: RouteTransitions.slideTransition,
