@@ -456,6 +456,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      showDragHandle: true,
+
       builder: (context) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -468,8 +470,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           children: [
             Row(
               children: [
-                const Icon(Icons.settings, color: AppColors.primaryGreen),
-                const SizedBox(width: 12),
                 Text(
                   'Settings',
                   style: Theme.of(
@@ -489,18 +489,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               title: 'Notifications',
               subtitle: 'Manage notification preferences',
               onTap: () => _showComingSoon('Notifications'),
-            ),
-            _buildSettingOption(
-              icon: Icons.privacy_tip,
-              title: 'Privacy & Security',
-              subtitle: 'Control your privacy settings',
-              onTap: () => _showComingSoon('Privacy & Security'),
-            ),
-            _buildSettingOption(
-              icon: Icons.help,
-              title: 'Help & Support',
-              subtitle: 'Get help and contact support',
-              onTap: () => _showComingSoon('Help & Support'),
             ),
             _buildSettingOption(
               icon: Icons.logout,

@@ -1,20 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animate_do/animate_do.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../../shared/widgets/loading_indicator.dart';
 import '../providers/tips_provider.dart';
 
 class DailyTipCard extends ConsumerStatefulWidget {
-  final bool isHomeScreen;
   final VoidCallback? onTap;
 
   const DailyTipCard({
     super.key,
-    this.isHomeScreen = true,
     this.onTap,
   });
 
@@ -54,21 +50,17 @@ class _DailyTipCardState extends ConsumerState<DailyTipCard>
     final dailyTipAsync = ref.watch(dailyTipProvider);
 
     return dailyTipAsync.when(
-      data: (tip) => _buildTipCard(context, tip),
+      data: (tip) => _buildCompactTipCard(context, tip),
       loading: () => _buildLoadingCard(),
       error: (error, stack) => _buildErrorCard(context, error),
     );
   }
 
-  Widget _buildTipCard(BuildContext context, Map<String, dynamic> tip) {
+  Widget _buildCompactTipCard(BuildContext context, Map<String, dynamic> tip) {
     final title = tip['title'] as String? ?? 'Daily Farming Tip';
     final content = tip['content'] as String? ?? 'No tip available today';
     final category = tip['category'] as String? ?? 'general';
-    final author = tip['author'] as String? ?? 'AgriBot';
     final createdAt = tip['createdAt'] as DateTime? ?? DateTime.now();
-    final likesCount = tip['likesCount'] as int? ?? 0;
-    final isLiked = tip['isLiked'] as bool? ?? false;
-    final isSaved = tip['isSaved'] as bool? ?? false;
 
     return GestureDetector(
       onTap: widget.onTap ?? () => _handleTap(context, tip),
@@ -79,260 +71,127 @@ class _DailyTipCardState extends ConsumerState<DailyTipCard>
         scale: _scaleAnimation,
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(20),
+          constraints: const BoxConstraints(
+            maxHeight: 180, // Limit the height to prevent overflow
+          ),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: widget.isHomeScreen
-                  ? [
-                Colors.white.withValues(alpha: 0.95),
-                Colors.white.withValues(alpha: 0.85),
-              ]
-                  : [
-                Colors.white,
-                Colors.white,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(20),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: widget.isHomeScreen
-                    ? Colors.white.withValues(alpha: 0.3)
-                    : Colors.black.withValues(alpha: 0.08),
-                blurRadius: widget.isHomeScreen ? 15 : 10,
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 10,
                 offset: const Offset(0, 5),
               ),
             ],
-            border: widget.isHomeScreen ? Border.all(
-              color: Colors.white.withValues(alpha: 0.4),
-              width: 1,
-            ) : null,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Header
+              // Header - compact version
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: AppColors.primaryGreen.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
                       _getCategoryIcon(category),
                       color: AppColors.primaryGreen,
-                      size: 20,
+                      size: 16,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.wb_sunny,
-                              color: widget.isHomeScreen
-                                  ? AppColors.primaryGreen
-                                  : AppColors.primaryGreen,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              widget.isHomeScreen ? 'Daily Tip' : 'Today\'s Featured Tip',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: widget.isHomeScreen
-                                    ? AppColors.primaryGreen
-                                    : AppColors.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
                         Text(
-                          DateFormat('MMMM d, yyyy').format(createdAt),
+                          DateFormat('MMM d, yyyy').format(createdAt),
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: widget.isHomeScreen
-                                ? AppColors.primaryGreen.withValues(alpha: 0.7)
-                                : AppColors.textSecondary,
+                            color: AppColors.textSecondary,
+                            fontSize: 11,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  if (!widget.isHomeScreen) ...[
-                    IconButton(
-                      onPressed: () => _toggleSave(tip),
-                      icon: Icon(
-                        isSaved ? Icons.bookmark : Icons.bookmark_border,
-                        color: isSaved ? AppColors.primaryGreen : AppColors.textSecondary,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryGreen.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      _formatCategory(category),
+                      style: TextStyle(
+                        color: AppColors.primaryGreen,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ] else ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryGreen.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _formatCategory(category),
-                        style: TextStyle(
-                          color: AppColors.primaryGreen,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ],
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
-              // Title
+              // Title - limited lines
               Text(
                 title,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: widget.isHomeScreen
-                      ? AppColors.textPrimary
-                      : AppColors.textPrimary,
-                  height: 1.3,
+                  color: AppColors.textPrimary,
+                  height: 1.2,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+
+              const SizedBox(height: 8),
+
+              // Content - limited lines
+              Flexible(
+                child: Text(
+                  content,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textPrimary.withValues(alpha: 0.8),
+                    height: 1.3,
+                  ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
 
               const SizedBox(height: 12),
 
-              // Content
-              Text(
-                content,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: widget.isHomeScreen
-                      ? AppColors.textPrimary.withValues(alpha: 0.8)
-                      : AppColors.textPrimary,
-                  height: 1.5,
-                ),
-                maxLines: widget.isHomeScreen ? 3 : null,
-                overflow: widget.isHomeScreen ? TextOverflow.ellipsis : null,
-              ),
-
-              const SizedBox(height: 16),
-
-              // Footer
+              // Footer - compact version
               Row(
                 children: [
-                  // Author
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: widget.isHomeScreen
-                          ? AppColors.primaryGreen.withValues(alpha: 0.1)
-                          : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.person,
-                          size: 12,
-                          color: widget.isHomeScreen
-                              ? AppColors.primaryGreen
-                              : AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          author,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: widget.isHomeScreen
-                                ? AppColors.primaryGreen
-                                : AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
+                  Icon(
+                    Icons.touch_app,
+                    size: 14,
+                    color: AppColors.primaryGreen,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Tap to read more',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.primaryGreen,
                     ),
                   ),
-
                   const Spacer(),
-
-                  // Interaction buttons
-                  if (!widget.isHomeScreen) ...[
-                    // Like button
-                    GestureDetector(
-                      onTap: () => _toggleLike(tip),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isLiked ? Icons.favorite : Icons.favorite_border,
-                              size: 16,
-                              color: isLiked ? Colors.red : AppColors.textSecondary,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              likesCount.toString(),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(width: 12),
-
-                    // Share button
-                    GestureDetector(
-                      onTap: () => _shareTip(tip),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        child: Icon(
-                          Icons.share,
-                          size: 16,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ] else ...[
-                    // Read more indicator for home screen
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryGreen.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Read more',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primaryGreen,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.arrow_forward,
-                            size: 12,
-                            color: AppColors.primaryGreen,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  Icon(
+                    Icons.arrow_forward,
+                    size: 14,
+                    color: AppColors.primaryGreen,
+                  ),
                 ],
               ),
             ],
@@ -345,19 +204,15 @@ class _DailyTipCardState extends ConsumerState<DailyTipCard>
   Widget _buildLoadingCard() {
     return Container(
       width: double.infinity,
-      height: widget.isHomeScreen ? 160 : 200,
-      padding: const EdgeInsets.all(20),
+      height: 150,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: widget.isHomeScreen
-            ? Colors.white.withValues(alpha: 0.9)
-            : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: widget.isHomeScreen
-                ? Colors.white.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.08),
-            blurRadius: widget.isHomeScreen ? 15 : 10,
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
             offset: const Offset(0, 5),
           ),
         ],
@@ -367,45 +222,49 @@ class _DailyTipCardState extends ConsumerState<DailyTipCard>
         children: [
           Row(
             children: [
-              const SkeletonLoader(width: 40, height: 40, borderRadius: 12),
-              const SizedBox(width: 12),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SkeletonLoader(
-                      width: MediaQuery.of(context).size.width * 0.3,
-                      height: 16,
-                      borderRadius: 4,
-                    ),
-                    const SizedBox(height: 4),
-                    SkeletonLoader(
-                      width: MediaQuery.of(context).size.width * 0.2,
+                    Container(
+                      width: 100,
                       height: 12,
-                      borderRadius: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          SkeletonLoader(
-            width: MediaQuery.of(context).size.width * 0.7,
-            height: 20,
-            borderRadius: 4,
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            height: 16,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(4),
+            ),
           ),
           const SizedBox(height: 8),
-          const SkeletonLoader(
-            width: double.infinity,
+          Container(
+            width: MediaQuery.of(context).size.width * 0.7,
             height: 14,
-            borderRadius: 4,
-          ),
-          const SizedBox(height: 4),
-          SkeletonLoader(
-            width: MediaQuery.of(context).size.width * 0.8,
-            height: 14,
-            borderRadius: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(4),
+            ),
           ),
         ],
       ),
@@ -415,49 +274,38 @@ class _DailyTipCardState extends ConsumerState<DailyTipCard>
   Widget _buildErrorCard(BuildContext context, Object error) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      height: 120,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: widget.isHomeScreen
-            ? Colors.white.withValues(alpha: 0.9)
-            : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: AppColors.error.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             Icons.error_outline,
             color: AppColors.error.withValues(alpha: 0.7),
-            size: 40,
+            size: 24,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
-            'Unable to load daily tip',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            'Unable to load tip',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: AppColors.textPrimary,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
-            'Please check your connection and try again',
+            'Tap to retry',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: AppColors.textSecondary,
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          ElevatedButton(
-            onPressed: () => ref.invalidate(dailyTipProvider),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryGreen,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            ),
-            child: const Text('Retry'),
           ),
         ],
       ),
@@ -495,16 +343,7 @@ class _DailyTipCardState extends ConsumerState<DailyTipCard>
   }
 
   void _handleTap(BuildContext context, Map<String, dynamic> tip) {
-    if (widget.isHomeScreen) {
-      // Navigate to tips screen and show this tip
-      context.go('/main', extra: {'initialTab': 3}); // Tips tab index
-    } else {
-      // Show tip details modal
-      _showTipDetails(context, tip);
-    }
-  }
-
-  void _showTipDetails(BuildContext context, Map<String, dynamic> tip) {
+    // Show tip details modal or navigate
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -568,20 +407,5 @@ class _DailyTipCardState extends ConsumerState<DailyTipCard>
         },
       ),
     );
-  }
-
-  void _toggleLike(Map<String, dynamic> tip) {
-    final tipId = tip['id'] as String;
-    ref.read(tipsActionsProvider).likeTip(tipId, 'current_user_id');
-  }
-
-  void _toggleSave(Map<String, dynamic> tip) {
-    final tipId = tip['id'] as String;
-    ref.read(tipsActionsProvider).saveTip(tipId, 'current_user_id');
-  }
-
-  void _shareTip(Map<String, dynamic> tip) {
-    // Implement sharing functionality
-    // You can use share_plus package
   }
 }

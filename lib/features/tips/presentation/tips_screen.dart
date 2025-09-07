@@ -22,57 +22,21 @@ class TipsScreen extends ConsumerStatefulWidget {
 }
 
 class _TipsScreenState extends ConsumerState<TipsScreen>
-    with AutomaticKeepAliveClientMixin, TickerProviderStateMixin {
+    with AutomaticKeepAliveClientMixin {
 
   @override
   bool get wantKeepAlive => true;
 
-  final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
-  late AnimationController _headerAnimationController;
-  late Animation<double> _headerAnimation;
 
   String _selectedCategory = 'all';
   String _searchQuery = '';
   bool _showSearch = false;
-  bool _isHeaderVisible = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _headerAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _headerAnimation = CurvedAnimation(
-      parent: _headerAnimationController,
-      curve: Curves.easeInOut,
-    );
-
-    _scrollController.addListener(_onScroll);
-    _headerAnimationController.forward();
-  }
 
   @override
   void dispose() {
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
     _searchController.dispose();
-    _headerAnimationController.dispose();
     super.dispose();
-  }
-
-  void _onScroll() {
-    final offset = _scrollController.offset;
-    final shouldHideHeader = offset > 100;
-
-    if (shouldHideHeader && _isHeaderVisible) {
-      setState(() => _isHeaderVisible = false);
-      _headerAnimationController.reverse();
-    } else if (!shouldHideHeader && !_isHeaderVisible) {
-      setState(() => _isHeaderVisible = true);
-      _headerAnimationController.forward();
-    }
   }
 
   @override
@@ -88,32 +52,110 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: SafeArea(
-          child: Column(
-            children: [
-              SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, -1),
-                  end: Offset.zero,
-                ).animate(_headerAnimation),
-                child: _buildHeader(context),
+          child: CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                expandedHeight: 330.0,
+                floating: false,
+                pinned: true,
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                automaticallyImplyLeading: false,
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: Column(
+                      children: [
+                        // Fixed header section
+                        _buildHeader(context),
+                        const SizedBox(height: 10),
+                        // Collapsible featured tip section
+                        Flexible(
+                          child: _buildDailyTipSection(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  titlePadding: EdgeInsets.zero,
+                  centerTitle: false,
+                ),
               ),
 
-              // Daily Tip Section
-              _buildDailyTipSection(),
-
               // Search Bar (when active)
-              if (_showSearch) _buildSearchBar(),
+              if (_showSearch)
+                SliverToBoxAdapter(
+                  child: _buildSearchBar(),
+                ),
 
               // Category Tabs
-              categories.when(
-                data: (cats) => _buildCategoryTabs(cats),
-                loading: () => const SizedBox(height: 60),
-                error: (_, _) => const SizedBox(),
+              SliverToBoxAdapter(
+                child: categories.when(
+                  data: (cats) => _buildCategoryTabs(cats),
+                  loading: () => const SizedBox(height: 60),
+                  error: (_, _) => const SizedBox(),
+                ),
               ),
 
               // Tips List
-              Expanded(
-                child: _buildTipsList(tips),
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 10),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+                  ),
+                  child: tips.when(
+                    data: (tipsList) {
+                      final filteredTips = _filterTips(tipsList);
+
+                      if (filteredTips.isEmpty) {
+                        return Container(
+                          height: MediaQuery.of(context).size.height * 0.5,
+                          child: _buildEmptyState(),
+                        );
+                      }
+
+                      return RefreshIndicator(
+                        onRefresh: () => _refreshTips(),
+                        color: AppColors.primaryGreen,
+                        child: Column(
+                          children: [
+                            const SizedBox(height: 20),
+                            ...filteredTips.asMap().entries.map((entry) {
+                              final index = entry.key;
+                              final tip = entry.value;
+                              return FadeInUp(
+                                duration: const Duration(milliseconds: 400),
+                                delay: Duration(milliseconds: index * 50),
+                                child: Container(
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 8,
+                                  ),
+                                  child: TipCard(
+                                    tip: tip,
+                                    onTap: () => _viewTipDetails(tip),
+                                    onSave: () => _toggleSaveTip(tip),
+                                    onLike: () => _toggleLikeTip(tip),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                            const SizedBox(height: 100), // Bottom padding
+                          ],
+                        ),
+                      );
+                    },
+                    loading: () => Container(
+                      height: MediaQuery.of(context).size.height * 0.5,
+                      child: _buildLoadingState(),
+                    ),
+                    error: (error, stack) => Container(
+                      height: MediaQuery.of(context).size.height * 0.5,
+                      child: _buildErrorState(error),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -127,7 +169,7 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
     return FadeInDown(
       duration: const Duration(milliseconds: 600),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         child: Row(
           children: [
             Container(
@@ -170,13 +212,6 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
                 color: Colors.white,
               ),
             ),
-            IconButton(
-              onPressed: () => _showSavedTips(),
-              icon: const Icon(
-                Icons.bookmark,
-                color: Colors.white,
-              ),
-            ),
           ],
         ),
       ),
@@ -188,9 +223,10 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
       duration: const Duration(milliseconds: 600),
       delay: const Duration(milliseconds: 200),
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        margin: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
@@ -210,7 +246,7 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
               ],
             ),
             const SizedBox(height: 12),
-            const DailyTipCard(isHomeScreen: false), // Show full version
+            const DailyTipCard(),
           ],
         ),
       ),
@@ -288,53 +324,6 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
             }).toList(),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildTipsList(AsyncValue<List<Map<String, dynamic>>> tipsAsync) {
-    return Container(
-      margin: const EdgeInsets.only(top: 10),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-      ),
-      child: tipsAsync.when(
-        data: (tips) {
-          final filteredTips = _filterTips(tips);
-
-          if (filteredTips.isEmpty) {
-            return _buildEmptyState();
-          }
-
-          return RefreshIndicator(
-            onRefresh: () => _refreshTips(),
-            color: AppColors.primaryGreen,
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(20),
-              itemCount: filteredTips.length,
-              itemBuilder: (context, index) {
-                final tip = filteredTips[index];
-                return FadeInUp(
-                  duration: const Duration(milliseconds: 400),
-                  delay: Duration(milliseconds: index * 50),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    child: TipCard(
-                      tip: tip,
-                      onTap: () => _viewTipDetails(tip),
-                      onSave: () => _toggleSaveTip(tip),
-                      onLike: () => _toggleLikeTip(tip),
-                    ),
-                  ),
-                );
-              },
-            ),
-          );
-        },
-        loading: () => _buildLoadingState(),
-        error: (error, stack) => _buildErrorState(error),
       ),
     );
   }
@@ -460,7 +449,9 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
       duration: const Duration(milliseconds: 800),
       delay: const Duration(milliseconds: 600),
       child: FloatingActionButton(
-        onPressed: () => _scrollToTop(),
+        onPressed: () {
+          // Scroll to top functionality could be implemented with a ScrollController if needed
+        },
         backgroundColor: AppColors.primaryGreen,
         child: const Icon(Icons.keyboard_arrow_up, color: Colors.white),
       ),
@@ -497,14 +488,6 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
     await Future.delayed(const Duration(seconds: 1));
   }
 
-  void _scrollToTop() {
-    _scrollController.animateTo(
-      0,
-      duration: const Duration(milliseconds: 500),
-      curve: Curves.easeInOut,
-    );
-  }
-
   void _viewTipDetails(Map<String, dynamic> tip) {
     showModalBottomSheet(
       context: context,
@@ -532,7 +515,6 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
   }
 
   void _showSavedTips() {
-
     context.push('/saved-tips');
   }
 }

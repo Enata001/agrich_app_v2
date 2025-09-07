@@ -118,17 +118,43 @@ class AppRouter {
         name: 'video-player',
         pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
+
           return CustomTransitionPage(
             key: state.pageKey,
             child: VideoPlayerScreen(
-              videoUrl: extra['videoUrl'] as String? ?? '',
-              videoTitle: extra['videoTitle'] as String? ?? '',
+              videoUrl: extra['videoUrl'] ?? extra['youtubeUrl'] ?? '',
+              videoTitle: extra['videoTitle'] ?? 'Video',
+              videoId: extra['videoId'],
+              youtubeVideoId: extra['youtubeVideoId'],
+              description: extra['description'],
+              videoData: extra,
             ),
-            transitionsBuilder: RouteTransitions.slidePullBackTransition,
+            transitionsBuilder: RouteTransitions.slideTransition,
           );
         },
       ),
 
+      GoRoute(
+        path: '${AppRoutes.videoPlayer}/:videoId',
+        name: 'video-player-with-id',
+        pageBuilder: (context, state) {
+          final videoId = state.pathParameters['videoId'] ?? '';
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+
+          return CustomTransitionPage(
+            key: state.pageKey,
+            child: VideoPlayerScreen(
+              videoUrl: extra['videoUrl'] ?? extra['youtubeUrl'] ?? '',
+              videoTitle: extra['videoTitle'] ?? 'Video',
+              videoId: videoId,
+              youtubeVideoId: extra['youtubeVideoId'],
+              description: extra['description'],
+              videoData: extra,
+            ),
+            transitionsBuilder: RouteTransitions.slideTransition,
+          );
+        },
+      ),
 
       GoRoute(
         path: AppRoutes.videosList,

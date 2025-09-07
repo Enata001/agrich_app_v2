@@ -240,17 +240,35 @@ class _VideosListScreenState extends ConsumerState<VideosListScreen> {
     final videosRepository = ref.read(videosRepositoryProvider);
     final videoId = video['id'] as String;
     final currentUser = ref.read(currentUserProvider);
+
     if (currentUser != null) {
-      ref.read(videosRepositoryProvider).markVideoAsWatched(videoId, currentUser.uid);
+      videosRepository.markVideoAsWatched(videoId, currentUser.uid);
     }
-    // Navigate to video player
-    context.push(
-      AppRoutes.videoPlayer,
-      extra: {
-        'videoUrl': video['url'] ?? '',
-        'videoTitle': video['title'] ?? '',
-        'videoId': video['id'] ?? '',
-      },
-    );
+
+    // Use the same navigation logic as above
+    context.push('/video-player/$videoId', extra: {
+      'videoId': videoId,
+      'videoUrl': video['videoUrl'] ?? '',
+      'youtubeVideoId': video['youtubeVideoId'],
+      'youtubeUrl': video['youtubeUrl'],
+      'embedUrl': video['embedUrl'],
+      'videoTitle': video['title'] ?? 'Video',
+      'description': video['description'] ?? '',
+      'category': video['category'] ?? '',
+      'duration': video['duration'] ?? '0:00',
+      'views': video['views'] ?? 0,
+      'likes': video['likes'] ?? 0,
+      'likedBy': video['likedBy'] ?? [],
+      'authorName': video['authorName'] ?? '',
+      'authorId': video['authorId'] ?? '',
+      'authorAvatar': video['authorAvatar'],
+      'uploadDate': video['uploadDate'],
+      'thumbnailUrl': video['thumbnailUrl'] ?? '',
+      'isYouTubeVideo': video['isYouTubeVideo'] == true ||
+          video['youtubeVideoId'] != null ||
+          video['youtubeUrl'] != null,
+      'commentsCount': video['commentsCount'] ?? 0,
+      'isActive': video['isActive'] ?? true,
+    });
   }
 }

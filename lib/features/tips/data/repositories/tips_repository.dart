@@ -57,7 +57,6 @@ class TipsRepository {
       return _firebaseService.listenToCollection(
         AppConfig.tipsCollection,
         where: {'isActive': true},
-        orderBy: 'priority',
         descending: true,
         limit: 50,
       ).map((snapshot) {
@@ -98,7 +97,6 @@ class TipsRepository {
       return _firebaseService.listenToCollection(
         AppConfig.tipsCollection,
         where: {'isActive': true, 'category': category.toLowerCase()},
-        orderBy: 'priority',
         descending: true,
       ).map((snapshot) {
         return snapshot.docs.map((doc) {

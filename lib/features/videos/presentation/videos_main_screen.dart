@@ -7,12 +7,11 @@ import 'package:go_router/go_router.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../auth/data/models/user_model.dart';
 import '../../shared/widgets/gradient_background.dart';
-import '../../shared/widgets/loading_indicator.dart';
 import '../../shared/widgets/custom_input_field.dart';
 import 'providers/video_provider.dart';
 import 'widgets/video_card.dart';
-import 'widgets/video_stats_card.dart';
 
 class VideosMainScreen extends ConsumerStatefulWidget {
   const VideosMainScreen({super.key});
@@ -589,19 +588,54 @@ class _VideosMainScreenState extends ConsumerState<VideosMainScreen>
     );
   }
 
-  void _playVideo(Map<String, dynamic> video) {
+  void _playVideo(Map<String, dynamic> video){
     final videoId = video['id'] as String;
-    context.push('/video-player/$videoId', extra: video);
+
+    // Track video as watched
+    final currentUser =UserModel.fromMap(ref.read(localStorageServiceProvider).getUserData()!);
+    ref.read(videosRepositoryProvider).markVideoAsWatched(videoId, currentUser.id);
+
+    // Determine if it's a YouTube video
+    final isYouTubeVideo = video['isYouTubeVideo'] == true ||
+        video['youtubeVideoId'] != null ||
+        video['youtubeUrl'] != null;
+
+    // Navigate to video player with all necessary data
+    context.push('/video-player/$videoId', extra: {
+      'videoId': videoId,
+      'videoUrl': video['videoUrl'] ?? '',
+      'youtubeVideoId': video['youtubeVideoId'],
+      'youtubeUrl': video['youtubeUrl'],
+      'embedUrl': video['embedUrl'],
+      'videoTitle': video['title'] ?? 'Video',
+      'description': video['description'] ?? '',
+      'category': video['category'] ?? '',
+      'duration': video['duration'] ?? '0:00',
+      'views': video['views'] ?? 0,
+      'likes': video['likes'] ?? 0,
+      'likedBy': video['likedBy'] ?? [],
+      'authorName': video['authorName'] ?? '',
+      'authorId': video['authorId'] ?? '',
+      'authorAvatar': video['authorAvatar'],
+      'uploadDate': video['uploadDate'],
+      'thumbnailUrl': video['thumbnailUrl'] ?? '',
+      'isYouTubeVideo': isYouTubeVideo,
+      'commentsCount': video['commentsCount'] ?? 0,
+      'isActive': video['isActive'] ?? true,
+    });
   }
 
   void _toggleLikeVideo(Map<String, dynamic> video) {
     final videoId = video['id'] as String;
-    ref.read(videosRepositoryProvider).likeVideo(videoId, 'current_user_id');
+    // Track video as watched
+    final currentUser =UserModel.fromMap(ref.read(localStorageServiceProvider).getUserData()!);
+    ref.read(videosRepositoryProvider).likeVideo(videoId, currentUser.id);
   }
 
   void _toggleSaveVideo(Map<String, dynamic> video) {
     final videoId = video['id'] as String;
-    ref.read(videosRepositoryProvider).saveVideo(videoId, 'current_user_id');
+    final currentUser =UserModel.fromMap(ref.read(localStorageServiceProvider).getUserData()!);
+    ref.read(videosRepositoryProvider).saveVideo(videoId, currentUser.id);
   }
 
   void _shareVideo(Map<String, dynamic> video) {

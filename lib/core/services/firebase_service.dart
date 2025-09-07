@@ -363,30 +363,44 @@ class FirebaseService {
     throw Exception('No tips available');
   }
 
+
+
+
+
+
+
+
+
   Future<QuerySnapshot> getVideos() async {
     return await _firestore
         .collection(AppConfig.videosCollection)
-        .orderBy('uploadDate', descending: true)
+        .where('isActive', isEqualTo: true)
+        .orderBy('createdAt', descending: true)
         .limit(AppConfig.videosPerPage)
         .get();
   }
 
   Future<QuerySnapshot> searchVideos(String query) async {
-    final searchTerms = query.toLowerCase().split(' ');
+
+
     return await _firestore
         .collection(AppConfig.videosCollection)
         .where('isActive', isEqualTo: true)
-        .where('searchTerms', arrayContainsAny: searchTerms)
         .get();
   }
 
   Future<QuerySnapshot> getVideosByCategory(String category) async {
-    return await _firestore
+    Query query = _firestore
         .collection(AppConfig.videosCollection)
-        .where('category', isEqualTo: category)
-        .orderBy('uploadDate', descending: true)
-        .limit(AppConfig.videosPerPage)
-        .get();
+        .where('isActive', isEqualTo: true)
+        .orderBy('createdAt', descending: true)
+        .limit(AppConfig.videosPerPage);
+
+    if (category != 'All') {
+      query = query.where('category', isEqualTo: category);
+    }
+
+    return await query.get();
   }
 
   Future<DocumentSnapshot> getVideo(String videoId) async {
@@ -397,26 +411,379 @@ class FirebaseService {
   }
 
   Future<DocumentReference> createVideo(Map<String, dynamic> videoData) async {
-    return await _firestore.collection(AppConfig.videosCollection).add({
+
+    final data = {
       ...videoData,
       'uploadDate': FieldValue.serverTimestamp(),
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
-      'views': 0,
-      'likes': 0,
-    });
+    };
+
+
+    data['views'] ??= 0;
+    data['likes'] ??= 0;
+    data['commentsCount'] ??= 0;
+    data['likedBy'] ??= <String>[];
+    data['isActive'] ??= true;
+
+    return await _firestore
+        .collection(AppConfig.videosCollection)
+        .add(data);
   }
 
   Future<void> updateVideo(String videoId, Map<String, dynamic> videoData) async {
-    await _firestore.collection(AppConfig.videosCollection).doc(videoId).update({
+    await _firestore
+        .collection(AppConfig.videosCollection)
+        .doc(videoId)
+        .update({
       ...videoData,
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
 
   Future<void> deleteVideo(String videoId) async {
-    await _firestore.collection(AppConfig.videosCollection).doc(videoId).delete();
+    await _firestore
+        .collection(AppConfig.videosCollection)
+        .doc(videoId)
+        .delete();
   }
+
+
+  Future<QuerySnapshot> getVideoComments(String videoId) async {
+    return await _firestore
+        .collection(AppConfig.videosCollection)
+        .doc(videoId)
+        .collection('comments')
+        .orderBy('createdAt', descending: true)
+        .get();
+  }
+
+  Future<DocumentReference> addVideoComment(String videoId, Map<String, dynamic> commentData) async {
+    return await _firestore
+        .collection(AppConfig.videosCollection)
+        .doc(videoId)
+        .collection('comments')
+        .add({
+      ...commentData,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> updateVideoComment(String videoId, String commentId, Map<String, dynamic> commentData) async {
+    await _firestore
+        .collection(AppConfig.videosCollection)
+        .doc(videoId)
+        .collection('comments')
+        .doc(commentId)
+        .update({
+      ...commentData,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> deleteVideoComment(String videoId, String commentId) async {
+    await _firestore
+        .collection(AppConfig.videosCollection)
+        .doc(videoId)
+        .collection('comments')
+        .doc(commentId)
+        .delete();
+  }
+
+
+  Future<Map<String, dynamic>> getVideoStats() async {
+    try {
+      final snapshot = await _firestore
+          .collection(AppConfig.videosCollection)
+          .where('isActive', isEqualTo: true)
+          .get();
+
+      int totalVideos = snapshot.docs.length;
+      int totalViews = 0;
+      int totalLikes = 0;
+      Map<String, int> categoryCounts = {};
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        totalViews += (data['views'] as int? ?? 0);
+        totalLikes += (data['likes'] as int? ?? 0);
+
+        final category = data['category'] as String? ?? 'Other';
+        categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
+      }
+
+      return {
+        'totalVideos': totalVideos,
+        'totalViews': totalViews,
+        'totalLikes': totalLikes,
+        'averageViews': totalVideos > 0 ? totalViews / totalVideos : 0.0,
+        'categoryCounts': categoryCounts,
+        'mostPopularCategory': categoryCounts.entries.isNotEmpty
+            ? categoryCounts.entries.reduce((a, b) => a.value > b.value ? a : b).key
+            : 'None',
+      };
+    } catch (e) {
+      print('Error getting video stats: $e');
+      return {
+        'totalVideos': 0,
+        'totalViews': 0,
+        'totalLikes': 0,
+        'averageViews': 0.0,
+        'categoryCounts': <String, int>{},
+        'mostPopularCategory': 'None',
+      };
+    }
+  }
+
+
+  Future<QuerySnapshot> getVideosPaginated({
+    String? category,
+    DocumentSnapshot? lastDocument,
+    int limit = 20,
+    String orderBy = 'createdAt',
+    bool descending = true,
+  }) async {
+    Query query = _firestore
+        .collection(AppConfig.videosCollection)
+        .where('isActive', isEqualTo: true);
+
+    if (category != null && category != 'All') {
+      query = query.where('category', isEqualTo: category);
+    }
+
+    query = query.orderBy(orderBy, descending: descending).limit(limit);
+
+    if (lastDocument != null) {
+      query = query.startAfterDocument(lastDocument);
+    }
+
+    return await query.get();
+  }
+
+
+  Future<QuerySnapshot> getPopularVideos({int limit = 20}) async {
+    return await _firestore
+        .collection(AppConfig.videosCollection)
+        .where('isActive', isEqualTo: true)
+        .orderBy('views', descending: true)
+        .limit(limit)
+        .get();
+  }
+
+
+  Future<QuerySnapshot> getTrendingVideos({int limit = 20}) async {
+    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+
+    return await _firestore
+        .collection(AppConfig.videosCollection)
+        .where('isActive', isEqualTo: true)
+        .where('createdAt', isGreaterThan: Timestamp.fromDate(thirtyDaysAgo))
+        .orderBy('createdAt')
+        .orderBy('views', descending: true)
+        .limit(limit)
+        .get();
+  }
+
+
+  Future<QuerySnapshot> getUserSavedVideos(String userId) async {
+    return await _firestore
+        .collection('saved_videos')
+        .where('userId', isEqualTo: userId)
+        .orderBy('savedAt', descending: true)
+        .get();
+  }
+
+
+  Future<QuerySnapshot> getUserLikedVideos(String userId) async {
+    return await _firestore
+        .collection(AppConfig.videosCollection)
+        .where('isActive', isEqualTo: true)
+        .where('likedBy', arrayContains: userId)
+        .orderBy('createdAt', descending: true)
+        .get();
+  }
+
+
+  Future<QuerySnapshot> getWatchHistory(String userId) async {
+    return await _firestore
+        .collection('watch_history')
+        .where('userId', isEqualTo: userId)
+        .orderBy('watchedAt', descending: true)
+        .limit(50)
+        .get();
+  }
+
+  Future<void> addToWatchHistory(String userId, String videoId) async {
+    await _firestore
+        .collection('watch_history')
+        .doc('${userId}_$videoId')
+        .set({
+      'userId': userId,
+      'videoId': videoId,
+      'watchedAt': FieldValue.serverTimestamp(),
+      'createdAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+
+  Future<void> incrementVideoViews(String videoId) async {
+    await _firestore
+        .collection(AppConfig.videosCollection)
+        .doc(videoId)
+        .update({
+      'views': FieldValue.increment(1),
+      'lastViewedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> updateVideoEngagement(String videoId, Map<String, dynamic> engagement) async {
+    await _firestore
+        .collection(AppConfig.videosCollection)
+        .doc(videoId)
+        .update({
+      ...engagement,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+
+  Future<void> batchCreateVideos(List<Map<String, dynamic>> videosData) async {
+    const int batchSize = 500;
+
+    for (int i = 0; i < videosData.length; i += batchSize) {
+      final batch = _firestore.batch();
+      final end = (i + batchSize < videosData.length) ? i + batchSize : videosData.length;
+
+      for (int j = i; j < end; j++) {
+        final videoData = videosData[j];
+        final docRef = _firestore.collection(AppConfig.videosCollection).doc();
+
+        final data = {
+          ...videoData,
+          'uploadDate': FieldValue.serverTimestamp(),
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+          'views': 0,
+          'likes': 0,
+          'commentsCount': 0,
+          'likedBy': <String>[],
+          'isActive': true,
+        };
+
+        batch.set(docRef, data);
+      }
+
+      await batch.commit();
+
+
+      if (i + batchSize < videosData.length) {
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+    }
+  }
+
+
+  String generateVideoId() {
+    return _firestore.collection(AppConfig.videosCollection).doc().id;
+  }
+
+
+  Future<bool> videoExists(String videoId) async {
+    try {
+      final doc = await getVideo(videoId);
+      return doc.exists;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> isVideoActive(String videoId) async {
+    try {
+      final doc = await getVideo(videoId);
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        return data['isActive'] == true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+
+  Future<void> cleanupVideoReferences(String videoId) async {
+    final batch = _firestore.batch();
+
+    try {
+
+      final savedVideosQuery = await _firestore
+          .collection('saved_videos')
+          .where('videoId', isEqualTo: videoId)
+          .get();
+
+      for (final doc in savedVideosQuery.docs) {
+        batch.delete(doc.reference);
+      }
+
+
+      final watchHistoryQuery = await _firestore
+          .collection('watch_history')
+          .where('videoId', isEqualTo: videoId)
+          .get();
+
+      for (final doc in watchHistoryQuery.docs) {
+        batch.delete(doc.reference);
+      }
+
+      await batch.commit();
+    } catch (e) {
+      print('Error cleaning up video references: $e');
+    }
+  }
+
+
+
+
+
+
+  Future<String> uploadVideoThumbnail(String imagePath, String videoId) async {
+    final file = File(imagePath);
+    final fileName = '${videoId}_thumbnail.jpg';
+    final ref = _storage.ref().child('${AppConfig.videoThumbnailsPath}/$fileName');
+
+    final uploadTask = ref.putFile(file);
+    final snapshot = await uploadTask.whenComplete(() {});
+
+    return await snapshot.ref.getDownloadURL();
+  }
+
+
+  @Deprecated('Use YouTube URLs instead of uploading videos to Firebase Storage')
+  Future<String> uploadVideo(String videoPath, String videoId) async {
+    final file = File(videoPath);
+    final fileName = '${videoId}_video.mp4';
+    final ref = _storage.ref().child('${AppConfig.videosPath}/$fileName');
+
+    final uploadTask = ref.putFile(file);
+    final snapshot = await uploadTask.whenComplete(() {});
+
+    return await snapshot.ref.getDownloadURL();
+  }
+
+  Future<void> deleteFile(String url) async {
+    try {
+      if (url.isNotEmpty && url.contains('firebase')) {
+        final ref = _storage.refFromURL(url);
+        await ref.delete();
+      }
+    } catch (e) {
+      print('Error deleting file: $e');
+
+    }
+  }
+
 
   Future<DocumentSnapshot> getChat(String chatId) async {
     return await _firestore
@@ -522,34 +889,6 @@ class FirebaseService {
     return await uploadImage(imagePath, fileName, 'chat_images');
   }
 
-  Future<String> uploadVideoThumbnail(String imagePath, String videoId) async {
-    final fileName = '${videoId}_thumbnail.jpg';
-    return await uploadImage(
-      imagePath,
-      fileName,
-      AppConfig.videoThumbnailsPath,
-    );
-  }
-
-  Future<String> uploadVideo(String videoPath, String videoId) async {
-    final file = File(videoPath);
-    final fileName = '${videoId}_video.mp4';
-    final ref = _storage.ref().child('${AppConfig.videosPath}/$fileName');
-
-    final uploadTask = ref.putFile(file);
-    final snapshot = await uploadTask.whenComplete(() {});
-
-    return await snapshot.ref.getDownloadURL();
-  }
-
-  Future<void> deleteFile(String url) async {
-    try {
-      final ref = _storage.refFromURL(url);
-      await ref.delete();
-    } catch (e) {
-
-    }
-  }
 
   Future<QuerySnapshot> getPostsPaginated({
     DocumentSnapshot? lastDocument,
@@ -567,25 +906,6 @@ class FirebaseService {
     return await query.get();
   }
 
-  Future<QuerySnapshot> getVideosPaginated({
-    String? category,
-    DocumentSnapshot? lastDocument,
-    int limit = 10,
-  }) async {
-    Query query = _firestore.collection(AppConfig.videosCollection);
-
-    if (category != null) {
-      query = query.where('category', isEqualTo: category);
-    }
-
-    query = query.orderBy('uploadDate', descending: true).limit(limit);
-
-    if (lastDocument != null) {
-      query = query.startAfterDocument(lastDocument);
-    }
-
-    return await query.get();
-  }
 
   Future<void> sendNotification(
       String userId,

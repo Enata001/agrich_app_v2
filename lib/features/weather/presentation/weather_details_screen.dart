@@ -298,9 +298,15 @@ class _WeatherDetailsScreenState extends ConsumerState<WeatherDetailsScreen>
       margin: const EdgeInsets.only(right: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isNow
-            ? Colors.white.withValues(alpha: 0.3)
-            : Colors.white.withValues(alpha: 0.1),
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primaryGreen.withValues(alpha: 0.6),
+            AppColors.stormy.withValues(alpha: 0.2),
+            AppColors.primaryGreen.withValues(alpha: 0.6),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(16),
         border: isNow
             ? Border.all(color: Colors.white, width: 2)
@@ -376,7 +382,15 @@ class _WeatherDetailsScreenState extends ConsumerState<WeatherDetailsScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primaryGreen.withValues(alpha: 0.6),
+            AppColors.sunny.withValues(alpha: 0.5),
+            // AppColors.primaryGreen.withValues(alpha: 0.6),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -427,7 +441,15 @@ class _WeatherDetailsScreenState extends ConsumerState<WeatherDetailsScreen>
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primaryGreen.withValues(alpha: 0.8),
+                  // Colors.black26.withValues(alpha: 0.2),
+                  AppColors.primaryGreen.withValues(alpha: 0.6),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -465,7 +487,15 @@ class _WeatherDetailsScreenState extends ConsumerState<WeatherDetailsScreen>
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primaryGreen.withValues(alpha: 0.85),
+            // AppColors.stormy.withValues(alpha: 0.2),
+            AppColors.primaryGreen.withValues(alpha: 0.5),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(16),
         border: isToday ? Border.all(color: Colors.white, width: 2) : null,
       ),
@@ -561,7 +591,15 @@ class _WeatherDetailsScreenState extends ConsumerState<WeatherDetailsScreen>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primaryGreen.withValues(alpha: 0.6),
+            AppColors.sunny.withValues(alpha: 0.6),
+            // AppColors.primaryGreen.withValues(alpha: 0.6),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -597,7 +635,15 @@ class _WeatherDetailsScreenState extends ConsumerState<WeatherDetailsScreen>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primaryGreen.withValues(alpha: 0.6),
+            AppColors.stormy.withValues(alpha: 0.5),
+            AppColors.primaryGreen.withValues(alpha: 0.6),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
