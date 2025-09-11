@@ -55,7 +55,7 @@ class _TipCardState extends State<TipCard>
     final title = widget.tip['title'] as String? ?? 'Farming Tip';
     final content = widget.tip['content'] as String? ?? '';
     final category = widget.tip['category'] as String? ?? 'general';
-    final author = widget.tip['author'] as String? ?? 'AgriBot';
+    // final author = widget.tip['author'] as String? ?? 'AgriBot';
     final createdAt = widget.tip['createdAt'] as DateTime? ?? DateTime.now();
     final likesCount = widget.tip['likesCount'] as int? ?? 0;
     final viewCount = widget.tip['viewCount'] as int? ?? 0;
@@ -76,8 +76,8 @@ class _TipCardState extends State<TipCard>
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 12,
+                color: AppColors.primaryGreen.withValues(alpha: 0.1),
+                blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
             ],
@@ -203,61 +203,61 @@ class _TipCardState extends State<TipCard>
                 child: Column(
                   children: [
                     // Author and date
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 12,
-                          backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.1),
-                          child: Text(
-                            author[0].toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primaryGreen,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                author,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              Text(
-                                DateFormat('MMM d, yyyy').format(createdAt),
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppColors.textTertiary,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // View count
-                        if (viewCount > 0) ...[
-                          Icon(
-                            Icons.visibility,
-                            size: 14,
-                            color: AppColors.textTertiary,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            _formatCount(viewCount),
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textTertiary,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                    // Row(
+                    //   children: [
+                    //     CircleAvatar(
+                    //       radius: 12,
+                    //       backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.1),
+                    //       child: Text(
+                    //         author[0].toUpperCase(),
+                    //         style: TextStyle(
+                    //           fontSize: 10,
+                    //           fontWeight: FontWeight.bold,
+                    //           color: AppColors.primaryGreen,
+                    //         ),
+                    //       ),
+                    //     ),
+                    //     const SizedBox(width: 8),
+                    //     Expanded(
+                    //       child: Column(
+                    //         crossAxisAlignment: CrossAxisAlignment.start,
+                    //         children: [
+                    //           Text(
+                    //             author,
+                    //             style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    //               fontWeight: FontWeight.w600,
+                    //               color: AppColors.textPrimary,
+                    //             ),
+                    //           ),
+                    //           Text(
+                    //             DateFormat('MMM d, yyyy').format(createdAt),
+                    //             style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    //               color: AppColors.textTertiary,
+                    //               fontSize: 11,
+                    //             ),
+                    //           ),
+                    //         ],
+                    //       ),
+                    //     ),
+                    //
+                    //     // View count
+                    //     if (viewCount > 0) ...[
+                    //       Icon(
+                    //         Icons.visibility,
+                    //         size: 14,
+                    //         color: AppColors.textTertiary,
+                    //       ),
+                    //       const SizedBox(width: 4),
+                    //       Text(
+                    //         _formatCount(viewCount),
+                    //         style: TextStyle(
+                    //           fontSize: 11,
+                    //           color: AppColors.textTertiary,
+                    //         ),
+                    //       ),
+                    //     ],
+                    //   ],
+                    // ),
 
                     const SizedBox(height: 12),
 

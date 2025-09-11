@@ -1,52 +1,72 @@
-// lib/features/videos/presentation/providers/video_provider.dart
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/providers/app_providers.dart';
+import '../../../../core/services/network_service.dart' hide networkServiceProvider;
 
-// All Videos Provider
-final allVideosProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+
+final recentVideosProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
   final videosRepository = ref.watch(videosRepositoryProvider);
   try {
-    return await videosRepository.getAllVideos();
-  } catch (e) {
-    print('Error loading all videos: $e');
-    return [];
-  }
-});
-
-// Recent Videos Provider (for home screen)
-final recentVideosProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
-  final videosRepository = ref.watch(videosRepositoryProvider);
-  try {
-    return await videosRepository.getRecentlyWatchedVideos();
+    return videosRepository.getRecentlyWatchedVideos();
   } catch (e) {
     print('Error loading recent videos: $e');
     return [];
   }
 });
 
-// Videos by Category Provider
-final videosByCategoryProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, category) async {
+
+final allVideosProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final networkService = ref.watch(networkServiceProvider);
   final videosRepository = ref.watch(videosRepositoryProvider);
+
+
+  if (!await networkService.checkConnectivity()) {
+    throw NetworkException('Videos require internet connection. Please check your network and try again.');
+  }
+
   try {
-    if (category == 'All') {
-      return await videosRepository.getAllVideos();
-    }
-    return await videosRepository.getVideosByCategory(category);
+    return await videosRepository.getAllVideos().timeout(
+      const Duration(seconds: 15),
+    );
   } catch (e) {
-    print('Error loading videos for category $category: $e');
-    return [];
+    if (e is NetworkException) rethrow;
+    throw Exception('Failed to load videos. Please check your connection and try again.');
   }
 });
 
-// Popular Videos Provider (based on views and likes)
-final popularVideosProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+
+final videosByCategoryProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, category) async {
+  final networkService = ref.watch(networkServiceProvider);
   final videosRepository = ref.watch(videosRepositoryProvider);
+
+  if (!await networkService.checkConnectivity()) {
+    throw NetworkException('Videos require internet connection. Please check your network and try again.');
+  }
+
+  try {
+    if (category == 'All') {
+      return await videosRepository.getAllVideos().timeout(Duration(seconds: 15));
+    }
+    return await videosRepository.getVideosByCategory(category).timeout(Duration(seconds: 15));
+  } catch (e) {
+    if (e is NetworkException) rethrow;
+    throw Exception('Failed to load videos for category: $category');
+  }
+});
+
+
+final popularVideosProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final networkService = ref.watch(networkServiceProvider);
+  final videosRepository = ref.watch(videosRepositoryProvider);
+
+  if (!await networkService.checkConnectivity()) {
+    throw NetworkException('Videos require internet connection. Please check your network and try again.');
+  }
+
   try {
     final allVideos = await videosRepository.getAllVideos();
 
-    // Sort by popularity (views + likes)
+
     final sortedVideos = List<Map<String, dynamic>>.from(allVideos);
     sortedVideos.sort((a, b) {
       final aViews = a['views'] as int? ?? 0;
@@ -54,7 +74,7 @@ final popularVideosProvider = FutureProvider<List<Map<String, dynamic>>>((ref) a
       final aLikes = a['likes'] as int? ?? 0;
       final bLikes = b['likes'] as int? ?? 0;
 
-      final aScore = aViews + (aLikes * 10); // Weight likes more
+      final aScore = aViews + (aLikes * 10);
       final bScore = bViews + (bLikes * 10);
 
       return bScore.compareTo(aScore);
@@ -62,18 +82,24 @@ final popularVideosProvider = FutureProvider<List<Map<String, dynamic>>>((ref) a
 
     return sortedVideos;
   } catch (e) {
-    print('Error loading popular videos: $e');
-    return [];
+    if (e is NetworkException) rethrow;
+    throw Exception('Failed to load popular videos');
   }
 });
 
-// Trending Videos Provider (recent + popular combination)
-final trendingVideosProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+
+final trendingVideosProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final networkService = ref.watch(networkServiceProvider);
   final videosRepository = ref.watch(videosRepositoryProvider);
+
+  if (!await networkService.checkConnectivity()) {
+    throw NetworkException('Videos require internet connection. Please check your network and try again.');
+  }
+
   try {
     final allVideos = await videosRepository.getAllVideos();
 
-    // Filter videos from last 30 days and sort by engagement
+
     final now = DateTime.now();
     final thirtyDaysAgo = now.subtract(const Duration(days: 30));
 
@@ -82,7 +108,7 @@ final trendingVideosProvider = FutureProvider<List<Map<String, dynamic>>>((ref) 
       return uploadDate.isAfter(thirtyDaysAgo);
     }).toList();
 
-    // Sort by engagement rate (views + likes + comments)
+
     recentVideos.sort((a, b) {
       final aViews = a['views'] as int? ?? 0;
       final bViews = b['views'] as int? ?? 0;
@@ -99,38 +125,95 @@ final trendingVideosProvider = FutureProvider<List<Map<String, dynamic>>>((ref) 
 
     return recentVideos;
   } catch (e) {
-    print('Error loading trending videos: $e');
-    return [];
+    if (e is NetworkException) rethrow;
+    throw Exception('Failed to load trending videos');
   }
 });
 
-// Search Videos Provider
-final searchVideosProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, query) async {
+
+
+
+
+final userSavedVideosProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, userId) async {
+  final networkService = ref.watch(networkServiceProvider);
+  final videosRepository = ref.watch(videosRepositoryProvider);
+
+  if (!await networkService.checkConnectivity()) {
+    throw NetworkException('Saved videos require internet connection');
+  }
+
+  try {
+    return await videosRepository.getUserSavedVideos(userId).timeout(
+      const Duration(seconds: 12),
+    );
+  } catch (e) {
+    if (e is NetworkException) rethrow;
+    throw Exception('Failed to load saved videos');
+  }
+});
+
+
+final userLikedVideosProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, userId) async {
+  final networkService = ref.watch(networkServiceProvider);
+  final videosRepository = ref.watch(videosRepositoryProvider);
+
+  if (!await networkService.checkConnectivity()) {
+    throw NetworkException('Liked videos require internet connection');
+  }
+
+  try {
+    return await videosRepository.getUserLikedVideos(userId).timeout(
+      const Duration(seconds: 12),
+    );
+  } catch (e) {
+    if (e is NetworkException) rethrow;
+    throw Exception('Failed to load liked videos');
+  }
+});
+
+
+
+final searchVideosProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, query) async {
   if (query.isEmpty) return [];
 
+  final networkService = ref.watch(networkServiceProvider);
   final videosRepository = ref.watch(videosRepositoryProvider);
+
+  if (!await networkService.checkConnectivity()) {
+    throw NetworkException('Search requires internet connection. Please check your network and try again.');
+  }
+
   try {
-    return await videosRepository.searchVideos(query);
+    return await videosRepository.searchVideos(query).timeout(
+      const Duration(seconds: 12),
+    );
   } catch (e) {
-    print('Error searching videos: $e');
-    return [];
+    if (e is NetworkException) rethrow;
+    throw Exception('Failed to search videos for: $query');
   }
 });
 
-// Video Categories Provider
+
+
 final videoCategoriesProvider = FutureProvider<List<String>>((ref) async {
   final videosRepository = ref.watch(videosRepositoryProvider);
   try {
     return await videosRepository.getVideoCategories();
   } catch (e) {
-    // Return default categories from config
+
     return ['All', ...AppConfig.videoCategories];
   }
 });
 
-// Video Stats Provider
+
 final videoStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   final videosRepository = ref.watch(videosRepositoryProvider);
+  final networkService = ref.watch(networkServiceProvider);
+
+
+  if (!await networkService.checkConnectivity()) {
+    return {'totalVideos': 0, 'totalViews': 0, 'totalLikes': 0};
+  }
   try {
     final allVideos = await videosRepository.getAllVideos();
 
@@ -139,7 +222,7 @@ final videoStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
     final totalLikes = allVideos.fold<int>(0, (sum, video) => sum + (video['likes'] as int? ?? 0));
     final averageViews = totalVideos > 0 ? totalViews / totalVideos : 0.0;
 
-    // Category distribution
+
     final categories = <String, int>{};
     for (final video in allVideos) {
       final category = video['category'] as String? ?? 'Other';
@@ -168,7 +251,7 @@ final videoStatsProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   }
 });
 
-// Video Details Provider
+
 final videoDetailsProvider = FutureProvider.family<Map<String, dynamic>?, String>((ref, videoId) async {
   final videosRepository = ref.watch(videosRepositoryProvider);
   try {
@@ -179,7 +262,7 @@ final videoDetailsProvider = FutureProvider.family<Map<String, dynamic>?, String
   }
 });
 
-// User's Saved Videos Provider
+
 final savedVideosProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, userId) async {
   final videosRepository = ref.watch(videosRepositoryProvider);
   try {
@@ -190,7 +273,7 @@ final savedVideosProvider = FutureProvider.family<List<Map<String, dynamic>>, St
   }
 });
 
-// User's Liked Videos Provider
+
 final likedVideosProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, userId) async {
   final videosRepository = ref.watch(videosRepositoryProvider);
   try {
@@ -201,7 +284,7 @@ final likedVideosProvider = FutureProvider.family<List<Map<String, dynamic>>, St
   }
 });
 
-// Video Player State Provider
+
 class VideoPlayerState {
   final String? currentVideoId;
   final String? currentVideoUrl;
@@ -283,11 +366,11 @@ class VideoPlayerNotifier extends StateNotifier<VideoPlayerState> {
   }
 }
 
-// Video Filter State Provider
+
 class VideoFilterState {
   final String category;
-  final String sortBy; // 'recent', 'popular', 'trending', 'duration'
-  final String duration; // 'all', 'short', 'medium', 'long'
+  final String sortBy;
+  final String duration;
   final bool showSavedOnly;
 
   VideoFilterState({
@@ -314,7 +397,7 @@ class VideoFilterState {
 
 final videoFilterProvider = StateProvider<VideoFilterState>((ref) => VideoFilterState());
 
-// Filtered Videos Provider (combines all filters)
+
 final filteredVideosProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final filter = ref.watch(videoFilterProvider);
   final videosRepository = ref.watch(videosRepositoryProvider);
@@ -322,14 +405,14 @@ final filteredVideosProvider = FutureProvider<List<Map<String, dynamic>>>((ref) 
   try {
     List<Map<String, dynamic>> videos;
 
-    // Get videos by category
+
     if (filter.category == 'All') {
       videos = await videosRepository.getAllVideos();
     } else {
       videos = await videosRepository.getVideosByCategory(filter.category);
     }
 
-    // Filter by duration
+
     if (filter.duration != 'all') {
       videos = videos.where((video) {
         final durationStr = video['duration'] as String? ?? '0:00';
@@ -348,12 +431,12 @@ final filteredVideosProvider = FutureProvider<List<Map<String, dynamic>>>((ref) 
       }).toList();
     }
 
-    // Filter saved only if requested
+
     if (filter.showSavedOnly) {
       videos = videos.where((video) => video['isSaved'] == true).toList();
     }
 
-    // Sort videos
+
     switch (filter.sortBy) {
       case 'popular':
         videos.sort((a, b) {
@@ -393,14 +476,14 @@ final filteredVideosProvider = FutureProvider<List<Map<String, dynamic>>>((ref) 
   }
 });
 
-// Video Actions Provider
+
 final videoActionsProvider = Provider<VideoActions>((ref) {
   final videosRepository = ref.watch(videosRepositoryProvider);
   return VideoActions(videosRepository, ref);
 });
 
 class VideoActions {
-  final dynamic videosRepository; // VideosRepository
+  final dynamic videosRepository;
   final Ref ref;
 
   VideoActions(this.videosRepository, this.ref);
@@ -408,7 +491,7 @@ class VideoActions {
   Future<void> likeVideo(String videoId, String userId) async {
     try {
       await videosRepository.likeVideo(videoId, userId);
-      // Invalidate relevant providers
+
       ref.invalidate(allVideosProvider);
       ref.invalidate(videoDetailsProvider(videoId));
       ref.invalidate(likedVideosProvider(userId));
@@ -421,7 +504,7 @@ class VideoActions {
   Future<void> saveVideo(String videoId, String userId) async {
     try {
       await videosRepository.saveVideo(videoId, userId);
-      // Invalidate relevant providers
+
       ref.invalidate(savedVideosProvider(userId));
     } catch (e) {
       print('Error saving video: $e');
@@ -435,7 +518,7 @@ class VideoActions {
       ref.invalidate(videoDetailsProvider(videoId));
     } catch (e) {
       print('Error incrementing view count: $e');
-      // Don't rethrow as view count is not critical
+
     }
   }
 
@@ -445,12 +528,12 @@ class VideoActions {
       ref.invalidate(recentVideosProvider);
     } catch (e) {
       print('Error adding to watch history: $e');
-      // Don't rethrow as watch history is not critical
+
     }
   }
 }
 
-// Helper function to parse duration string
+
 Duration _parseDuration(String durationStr) {
   try {
     final parts = durationStr.split(':');

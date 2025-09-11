@@ -1,3 +1,6 @@
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/services/firebase_service.dart';
@@ -10,10 +13,8 @@ class TipsRepository {
 
   TipsRepository(this._firebaseService, this._localStorageService);
 
-  
   Future<Map<String, dynamic>> getDailyTip() async {
     try {
-      
       final cachedTip = _localStorageService.getDailyTip();
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
@@ -21,61 +22,73 @@ class TipsRepository {
         return cachedTip;
       }
 
-      
+      print("Nothing found. Loading tip");
+
       final featuredTip = await _getTodaysFeaturedTip();
+      print("This is the tip: $featuredTip");
       if (featuredTip != null) {
         await _localStorageService.setDailyTip(featuredTip);
         return featuredTip;
       }
 
-      
       final randomTip = await _getRandomTip();
       if (randomTip != null) {
         await _localStorageService.setDailyTip(randomTip);
         return randomTip;
       }
 
-      
       final defaultTip = await _createDefaultTip();
       await _localStorageService.setDailyTip(defaultTip);
       return defaultTip;
     } catch (e) {
-      
       final cachedTip = _localStorageService.getDailyTip();
       if (cachedTip != null) {
         return cachedTip;
       }
 
-      
       return _getDefaultTipData();
     }
   }
 
-  
-  Stream<List<Map<String, dynamic>>> getAllTips() {
+  Future<List<Map<String, dynamic>>> getCachedTipsByCategory(String category) async {
+    return _localStorageService.getCachedTipsByCategory(category);
+  }
+
+  Future<List<Map<String, dynamic>>> getCachedTips() async {
+    return _localStorageService.getCachedTips();
+  }
+
+  Stream<List<Map<String, dynamic>>> getAllTips() async* {
+    final cachedTips = await getCachedTips();
+    if (cachedTips.isNotEmpty) {
+      yield cachedTips;
+    }
+
     try {
-      return _firebaseService.listenToCollection(
+      final stream = _firebaseService.listenToCollection(
         AppConfig.tipsCollection,
         where: {'isActive': true},
+        orderBy: 'createdAt',
         descending: true,
-        limit: 50,
       ).map((snapshot) {
-        return snapshot.docs.map((doc) {
+        final tips = snapshot.docs.map((doc) {
           final data = doc.data() as Map<String, dynamic>;
           return {
             'id': doc.id,
             ...data,
             'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-            'updatedAt': (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
           };
         }).toList();
+
+        _localStorageService.setCachedTips(tips);
+        return tips;
       });
+
+      yield* stream;
     } catch (e) {
-      return Stream.value(_getDefaultTips());
+      yield cachedTips;
     }
   }
-
-
   Future<bool> isTipLiked(String tipId, String userId) async {
     try {
       final doc = await _firebaseService.getTip(tipId);
@@ -90,47 +103,49 @@ class TipsRepository {
     }
   }
 
-
-
-  Stream<List<Map<String, dynamic>>> getTipsByCategory(String category) {
-    try {
-      return _firebaseService.listenToCollection(
-        AppConfig.tipsCollection,
-        where: {'isActive': true, 'category': category.toLowerCase()},
-        descending: true,
-      ).map((snapshot) {
-        return snapshot.docs.map((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          return {
-            'id': doc.id,
-            ...data,
-            'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-            'updatedAt': (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-          };
-        }).toList();
-      });
-    } catch (e) {
-      return Stream.value([]);
+  Stream<List<Map<String, dynamic>>> getTipsByCategory(String category) async* {
+    final cachedTips = await getCachedTipsByCategory(category);
+    if (cachedTips.isNotEmpty) {
+      yield cachedTips;
     }
+
+    yield* _firebaseService.listenToCollection(
+      AppConfig.tipsCollection,
+      where: {'isActive': true, 'category': category},
+      orderBy: 'createdAt',
+      descending: true,
+    ).map((snapshot) {
+      final tips = snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return {
+          'id': doc.id,
+          ...data,
+          'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        };
+      }).toList();
+
+      _localStorageService.setCachedTipsByCategory(category, tips);
+      return tips;
+    }).handleError((e) {
+      return cachedTips;
+    });
   }
 
-  
   Future<void> saveTip(String tipId, String userId) async {
     try {
       final savedTips = await _firebaseService.getSavedTips(userId);
-      final alreadySaved = savedTips.docs.any((doc) =>
-      (doc.data() as Map<String, dynamic>)['tipId'] == tipId);
+      final alreadySaved = savedTips.docs.any(
+        (doc) => (doc.data() as Map<String, dynamic>)['tipId'] == tipId,
+      );
 
       if (alreadySaved) {
-        
-        final savedTipDoc = savedTips.docs.firstWhere((doc) =>
-        (doc.data() as Map<String, dynamic>)['tipId'] == tipId);
+        final savedTipDoc = savedTips.docs.firstWhere(
+          (doc) => (doc.data() as Map<String, dynamic>)['tipId'] == tipId,
+        );
         await _firebaseService.unsaveTip(savedTipDoc.id);
       } else {
-        
         await _firebaseService.saveTip(userId, tipId);
 
-        
         await _incrementTipSaveCount(tipId);
       }
     } catch (e) {
@@ -138,12 +153,12 @@ class TipsRepository {
     }
   }
 
-  
   Future<bool> isTipSaved(String tipId, String userId) async {
     try {
       final savedTips = await _firebaseService.getSavedTips(userId);
-      return savedTips.docs.any((doc) =>
-      (doc.data() as Map<String, dynamic>)['tipId'] == tipId);
+      return savedTips.docs.any(
+        (doc) => (doc.data() as Map<String, dynamic>)['tipId'] == tipId,
+      );
     } catch (e) {
       return false;
     }
@@ -157,8 +172,10 @@ class TipsRepository {
         return {
           'id': doc.id,
           ...data,
-          'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-          'updatedAt': (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          'createdAt':
+              (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          'updatedAt':
+              (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
         };
       }
       return null;
@@ -168,48 +185,50 @@ class TipsRepository {
     }
   }
 
-  
   Stream<List<Map<String, dynamic>>> getUserSavedTips(String userId) {
     try {
-      return _firebaseService.listenToCollection(
-        'saved_tips', 
-        where: {'userId': userId},
-        orderBy: 'createdAt',
-        descending: true,
-      ).asyncMap((snapshot) async {
-        final savedTips = <Map<String, dynamic>>[];
+      return _firebaseService
+          .listenToCollection(
+            'saved_tips',
+            where: {'userId': userId},
+            orderBy: 'createdAt',
+            descending: true,
+          )
+          .asyncMap((snapshot) async {
+            final savedTips = <Map<String, dynamic>>[];
 
-        for (final doc in snapshot.docs) {
-          final data = doc.data() as Map<String, dynamic>;
-          final tipId = data['tipId'] as String;
+            for (final doc in snapshot.docs) {
+              final data = doc.data() as Map<String, dynamic>;
+              final tipId = data['tipId'] as String;
 
-          try {
-            final tipDoc = await _firebaseService.getTip(tipId);
-            if (tipDoc.exists) {
-              final tipData = tipDoc.data() as Map<String, dynamic>;
-              if (tipData['isActive'] == true) {
-                savedTips.add({
-                  'id': tipDoc.id,
-                  'savedAt': (data['createdAt'] as Timestamp?)?.toDate(),
-                  ...tipData,
-                  'createdAt': (tipData['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-                  'updatedAt': (tipData['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-                });
-              }
+              try {
+                final tipDoc = await _firebaseService.getTip(tipId);
+                if (tipDoc.exists) {
+                  final tipData = tipDoc.data() as Map<String, dynamic>;
+                  if (tipData['isActive'] == true) {
+                    savedTips.add({
+                      'id': tipDoc.id,
+                      'savedAt': (data['createdAt'] as Timestamp?)?.toDate(),
+                      ...tipData,
+                      'createdAt':
+                          (tipData['createdAt'] as Timestamp?)?.toDate() ??
+                          DateTime.now(),
+                      'updatedAt':
+                          (tipData['updatedAt'] as Timestamp?)?.toDate() ??
+                          DateTime.now(),
+                    });
+                  }
+                }
+              } catch (e) {}
             }
-          } catch (e) {
-            
-          }
-        }
 
-        return savedTips;
-      });
+            return savedTips;
+          });
     } catch (e) {
       return Stream.value([]);
     }
   }
 
-  
   Future<void> likeTip(String tipId, String userId) async {
     try {
       final tipDoc = await _firebaseService.getTip(tipId);
@@ -220,14 +239,12 @@ class TipsRepository {
       final currentLikesCount = data['likesCount'] as int? ?? 0;
 
       if (likedBy.contains(userId)) {
-        
         likedBy.remove(userId);
         await _firebaseService.updateTip(tipId, {
           'likedBy': likedBy,
           'likesCount': currentLikesCount - 1,
         });
       } else {
-        
         likedBy.add(userId);
         await _firebaseService.updateTip(tipId, {
           'likedBy': likedBy,
@@ -239,34 +256,30 @@ class TipsRepository {
     }
   }
 
-  
   Future<void> rateTip(String tipId, int rating, String userId) async {
     try {
       if (rating < 1 || rating > 5) {
         throw Exception('Rating must be between 1 and 5');
       }
 
-      
       await FirebaseFirestore.instance
           .collection(AppConfig.tipsCollection)
           .doc(tipId)
           .collection('ratings')
           .doc(userId)
           .set({
-        'userId': userId,
-        'rating': rating,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+            'userId': userId,
+            'rating': rating,
+            'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
 
-      
       await _updateTipAverageRating(tipId);
     } catch (e) {
       throw Exception('Failed to rate tip: $e');
     }
   }
 
-  
   Future<List<String>> getTipCategories() async {
     try {
       final snapshot = await FirebaseFirestore.instance
@@ -286,11 +299,17 @@ class TipsRepository {
       final sortedCategories = categories.toList()..sort();
       return ['all', ...sortedCategories];
     } catch (e) {
-      return ['all', 'planting', 'watering', 'pest control', 'harvesting', 'soil care'];
+      return [
+        'all',
+        'planting',
+        'watering',
+        'pest control',
+        'harvesting',
+        'soil care',
+      ];
     }
   }
 
-  
   Future<List<Map<String, dynamic>>> searchTips(String query) async {
     try {
       if (query.isEmpty) return [];
@@ -308,8 +327,10 @@ class TipsRepository {
         return {
           'id': doc.id,
           ...data,
-          'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-          'updatedAt': (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          'createdAt':
+              (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          'updatedAt':
+              (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
         };
       }).toList();
     } catch (e) {
@@ -317,7 +338,6 @@ class TipsRepository {
     }
   }
 
-  
   Future<void> initializeDefaultTips() async {
     try {
       final tipsCount = await FirebaseFirestore.instance
@@ -334,7 +354,6 @@ class TipsRepository {
     }
   }
 
-  
   Future<void> incrementViewCount(String tipId) async {
     try {
       await _firebaseService.updateTip(tipId, {
@@ -342,12 +361,10 @@ class TipsRepository {
         'lastViewedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      
       print('Failed to increment view count: $e');
     }
   }
 
-  
   Future<Map<String, int>> getUserTipStats(String userId) async {
     try {
       final savedTipsSnapshot = await FirebaseFirestore.instance
@@ -356,19 +373,12 @@ class TipsRepository {
           .count()
           .get();
 
-      return {
-        'savedTips': savedTipsSnapshot.count ?? 0,
-        'likedTips': 0, 
-      };
+      return {'savedTips': savedTipsSnapshot.count ?? 0, 'likedTips': 0};
     } catch (e) {
-      return {
-        'savedTips': 0,
-        'likedTips': 0,
-      };
+      return {'savedTips': 0, 'likedTips': 0};
     }
   }
 
-  
   Future<List<Map<String, dynamic>>> getTipsHistory() async {
     try {
       final snapshot = await _firebaseService.getTips();
@@ -383,7 +393,8 @@ class TipsRepository {
           'date': data['date'] ?? '',
           'author': data['author'] ?? 'AgriCH Team',
           'title': data['title'] ?? '',
-          'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          'createdAt':
+              (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
         });
       }
 
@@ -393,28 +404,9 @@ class TipsRepository {
     }
   }
 
-  
   Future<Map<String, dynamic>?> _getTodaysFeaturedTip() async {
     try {
-      final today = DateTime.now();
-      final startOfDay = DateTime(today.year, today.month, today.day);
-      final endOfDay = startOfDay.add(const Duration(days: 1));
-
-      final snapshot = await FirebaseFirestore.instance
-          .collection(AppConfig.tipsCollection)
-          .where('isActive', isEqualTo: true)
-          .where('isFeatured', isEqualTo: true)
-          .where('featuredDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
-          .where('featuredDate', isLessThan: Timestamp.fromDate(endOfDay))
-          .limit(1)
-          .get();
-
-      if (snapshot.docs.isNotEmpty) {
-        final data = snapshot.docs.first.data();
-        return _formatTipData(snapshot.docs.first.id, data);
-      }
-
-      return null;
+      return _getRandomTip();
     } catch (e) {
       return null;
     }
@@ -422,21 +414,43 @@ class TipsRepository {
 
   Future<Map<String, dynamic>?> _getRandomTip() async {
     try {
+      final randomValue = Random().nextDouble();
+
       final snapshot = await FirebaseFirestore.instance
           .collection(AppConfig.tipsCollection)
           .where('isActive', isEqualTo: true)
-          .where('priority', isGreaterThan: 7)
-          .limit(10)
+          .where('randomIndex', isGreaterThanOrEqualTo: randomValue)
+          .orderBy('randomIndex')
+          .limit(1)
           .get();
 
-      if (snapshot.docs.isNotEmpty) {
-        final randomIndex = DateTime.now().day % snapshot.docs.length;
-        final doc = snapshot.docs[randomIndex];
-        return _formatTipData(doc.id, doc.data());
+      // If no result, fallback to lower range
+      if (snapshot.docs.isEmpty) {
+        final fallbackSnapshot = await FirebaseFirestore.instance
+            .collection(AppConfig.tipsCollection)
+            .where('isActive', isEqualTo: true)
+            .orderBy('randomIndex')
+            .limit(1)
+            .get();
+
+
+
+        print("Looking fot tip here");
+
+        if (fallbackSnapshot.docs.isNotEmpty) {
+          final doc = fallbackSnapshot.docs.first;
+          return _formatTipData(doc.id, doc.data());
+        }
+
+        return null;
       }
 
-      return null;
-    } catch (e) {
+      final doc = snapshot.docs.first;
+      return _formatTipData(doc.id, doc.data());
+    } catch (e, stack) {
+      if (kDebugMode) {
+        print('❌ Error fetching random tip: $e\n$stack');
+      }
       return null;
     }
   }
@@ -446,7 +460,8 @@ class TipsRepository {
 
     final defaultTipData = {
       'title': 'Start Your Farming Journey',
-      'content': 'Welcome to AgriCH! Check soil moisture before watering your plants. Overwatering is one of the most common mistakes new gardeners make.',
+      'content':
+          'Welcome to AgriCH! Check soil moisture before watering your plants. Overwatering is one of the most common mistakes new gardeners make.',
       'category': 'watering',
       'priority': 8,
       'difficulty': 'beginner',
@@ -471,7 +486,6 @@ class TipsRepository {
       'isActive': true,
     };
 
-    
     try {
       final docRef = await _firebaseService.createTip(defaultTipData);
       return _formatTipData(docRef.id, defaultTipData);
@@ -484,7 +498,8 @@ class TipsRepository {
     final defaultTips = [
       {
         'title': 'Test Your Soil pH',
-        'content': 'Most vegetables prefer slightly acidic to neutral soil (pH 6.0-7.0). Test your soil pH regularly and amend with lime to raise pH or sulfur to lower it.',
+        'content':
+            'Most vegetables prefer slightly acidic to neutral soil (pH 6.0-7.0). Test your soil pH regularly and amend with lime to raise pH or sulfur to lower it.',
         'category': 'soil care',
         'priority': 9,
         'difficulty': 'intermediate',
@@ -495,7 +510,8 @@ class TipsRepository {
       },
       {
         'title': 'Companion Planting Basics',
-        'content': 'Plant basil near tomatoes to improve flavor and repel pests. Marigolds planted throughout the garden help deter harmful insects.',
+        'content':
+            'Plant basil near tomatoes to improve flavor and repel pests. Marigolds planted throughout the garden help deter harmful insects.',
         'category': 'planting',
         'priority': 8,
         'difficulty': 'beginner',
@@ -506,7 +522,8 @@ class TipsRepository {
       },
       {
         'title': 'Water Early Morning',
-        'content': 'Water your plants early in the morning (6-8 AM) to reduce evaporation and give plants time to dry before evening, preventing fungal diseases.',
+        'content':
+            'Water your plants early in the morning (6-8 AM) to reduce evaporation and give plants time to dry before evening, preventing fungal diseases.',
         'category': 'watering',
         'priority': 7,
         'difficulty': 'beginner',
@@ -517,7 +534,8 @@ class TipsRepository {
       },
       {
         'title': 'Mulch for Moisture Retention',
-        'content': 'Apply 2-3 inches of organic mulch around plants to retain soil moisture, suppress weeds, and regulate soil temperature.',
+        'content':
+            'Apply 2-3 inches of organic mulch around plants to retain soil moisture, suppress weeds, and regulate soil temperature.',
         'category': 'soil care',
         'priority': 8,
         'difficulty': 'beginner',
@@ -528,7 +546,8 @@ class TipsRepository {
       },
       {
         'title': 'Harvest at the Right Time',
-        'content': 'Pick tomatoes when they start to turn color and ripen them indoors to prevent cracking. Harvest lettuce in the morning when leaves are crisp.',
+        'content':
+            'Pick tomatoes when they start to turn color and ripen them indoors to prevent cracking. Harvest lettuce in the morning when leaves are crisp.',
         'category': 'harvesting',
         'priority': 9,
         'difficulty': 'intermediate',
@@ -539,7 +558,8 @@ class TipsRepository {
       },
       {
         'title': 'Natural Pest Control',
-        'content': 'Spray neem oil solution (1-2 tablespoons per quart of water) on plants in the evening to control aphids, whiteflies, and other soft-bodied insects.',
+        'content':
+            'Spray neem oil solution (1-2 tablespoons per quart of water) on plants in the evening to control aphids, whiteflies, and other soft-bodied insects.',
         'category': 'pest control',
         'priority': 8,
         'difficulty': 'intermediate',
@@ -550,7 +570,8 @@ class TipsRepository {
       },
       {
         'title': 'Crop Rotation Benefits',
-        'content': 'Rotate plant families each season. Follow heavy feeders (tomatoes) with light feeders (beans) to maintain soil health and prevent pest buildup.',
+        'content':
+            'Rotate plant families each season. Follow heavy feeders (tomatoes) with light feeders (beans) to maintain soil health and prevent pest buildup.',
         'category': 'planting',
         'priority': 7,
         'difficulty': 'advanced',
@@ -561,7 +582,8 @@ class TipsRepository {
       },
       {
         'title': 'Composting Kitchen Scraps',
-        'content': 'Create nutrient-rich compost by layering green materials (kitchen scraps) with brown materials (dry leaves) in a 1:3 ratio. Turn weekly.',
+        'content':
+            'Create nutrient-rich compost by layering green materials (kitchen scraps) with brown materials (dry leaves) in a 1:3 ratio. Turn weekly.',
         'category': 'soil care',
         'priority': 6,
         'difficulty': 'intermediate',
@@ -577,7 +599,6 @@ class TipsRepository {
     for (int i = 0; i < defaultTips.length; i++) {
       final tipData = defaultTips[i];
 
-      
       final tags = tipData['tags'] as List<dynamic>? ?? [];
       final tagsString = tags.map((tag) => tag.toString()).join(' ');
       final searchTerms = _generateSearchTerms(
@@ -630,8 +651,10 @@ class TipsRepository {
       'tags': List<String>.from(data['tags'] ?? []),
       'author': data['author'] ?? 'AgriCH Team',
       'date': today,
-      'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      'updatedAt': (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      'createdAt':
+          (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      'updatedAt':
+          (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     };
   }
 
@@ -641,7 +664,8 @@ class TipsRepository {
     return {
       'id': 'default_tip',
       'title': 'Start Your Farming Journey',
-      'content': 'Welcome to AgriCH! Check soil moisture before watering your plants. Overwatering is one of the most common mistakes new gardeners make.',
+      'content':
+          'Welcome to AgriCH! Check soil moisture before watering your plants. Overwatering is one of the most common mistakes new gardeners make.',
       'category': 'watering',
       'priority': 8,
       'difficulty': 'beginner',
@@ -656,43 +680,10 @@ class TipsRepository {
     };
   }
 
-  List<Map<String, dynamic>> _getDefaultTips() {
-    return [
-      {
-        'id': 'default_1',
-        'title': 'Check Soil Moisture',
-        'content': 'Always check soil moisture before watering. Stick your finger 2 inches deep into the soil.',
-        'category': 'watering',
-        'priority': 8,
-        'difficulty': 'beginner',
-        'estimatedTime': '2 minutes',
-        'tools': ['Your finger', 'Soil moisture meter'],
-        'benefits': ['Prevent overwatering', 'Healthy root development'],
-        'tags': ['watering', 'soil', 'beginner'],
-        'author': 'AgriCH Team',
-        'createdAt': DateTime.now(),
-        'updatedAt': DateTime.now(),
-      },
-      {
-        'id': 'default_2',
-        'title': 'Morning Watering',
-        'content': 'Water your plants early in the morning when evaporation is minimal and plants can absorb water effectively.',
-        'category': 'watering',
-        'priority': 7,
-        'difficulty': 'beginner',
-        'estimatedTime': '5 minutes',
-        'tools': ['Watering can', 'Hose'],
-        'benefits': ['Better water absorption', 'Disease prevention'],
-        'tags': ['watering', 'timing', 'morning'],
-        'author': 'AgriCH Team',
-        'createdAt': DateTime.now(),
-        'updatedAt': DateTime.now(),
-      },
-    ];
-  }
 
   List<String> _generateSearchTerms(String text) {
-    final words = text.toLowerCase()
+    final words = text
+        .toLowerCase()
         .replaceAll(RegExp(r'[^\w\s]'), '')
         .split(' ')
         .where((word) => word.isNotEmpty && word.length > 2)
@@ -703,7 +694,7 @@ class TipsRepository {
 
     for (final word in words) {
       searchTerms.add(word);
-      
+
       if (word.length > 4) {
         for (int i = 3; i <= word.length; i++) {
           searchTerms.add(word.substring(0, i));
@@ -719,9 +710,7 @@ class TipsRepository {
       await _firebaseService.updateTip(tipId, {
         'saveCount': FieldValue.increment(1),
       });
-    } catch (e) {
-      
-    }
+    } catch (e) {}
   }
 
   Future<void> _updateTipAverageRating(String tipId) async {

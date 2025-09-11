@@ -10,6 +10,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../shared/widgets/gradient_background.dart';
 import '../../shared/widgets/loading_indicator.dart';
+import '../../shared/widgets/network_error_widget.dart';
 import 'providers/video_provider.dart';
 import 'widgets/video_thumbnail_card.dart';
 
@@ -40,30 +41,30 @@ class _VideosListScreenState extends ConsumerState<VideosListScreen> {
 
     return CustomScaffold(
       showGradient: true,
-      appBar: AppBar(
-        title: Text(widget.category),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => context.pop(),
-          icon: const Icon(Icons.arrow_back_ios),
-        ),
-        actions: [
-          IconButton(
-            onPressed: () {
-              // TODO: Implement search
-            },
-            icon: const Icon(Icons.search),
-          ),
-        ],
-      ),
+      // appBar: AppBar(
+      //   title: Text(widget.category),
+      //   backgroundColor: Colors.transparent,
+      //   elevation: 0,
+      //   leading: IconButton(
+      //     onPressed: () => context.pop(),
+      //     icon: const Icon(Icons.arrow_back_ios),
+      //   ),
+      //   actions: [
+      //     IconButton(
+      //       onPressed: () {
+      //         // TODO: Implement search
+      //       },
+      //       icon: const Icon(Icons.search),
+      //     ),
+      //   ],
+      // ),
       body: SafeArea(
         child: videos.when(
           data: (videoList) => videoList.isEmpty
               ? _buildEmptyState(context)
               : _buildVideosList(context, videoList),
           loading: () => _buildLoadingState(),
-          error: (error, stack) => _buildErrorState(context),
+          error: (error, stack) => _buildErrorState(),
         ),
       ),
     );
@@ -82,16 +83,12 @@ class _VideosListScreenState extends ConsumerState<VideosListScreen> {
         itemCount: videos.length,
         itemBuilder: (context, index) {
           final video = videos[index];
-          return FadeInUp(
-            duration: const Duration(milliseconds: 600),
-            delay: Duration(milliseconds: index * 100),
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 20),
-              child: VideoThumbnailCard(
-                video: video,
-                height: 180,
-                onTap: () => _playVideo(context, video),
-              ),
+          return Container(
+            margin: const EdgeInsets.only(bottom: 20),
+            child: VideoThumbnailCard(
+              video: video,
+              height: 180,
+              onTap: () => _playVideo(context, video),
             ),
           );
         },
@@ -176,63 +173,11 @@ class _VideosListScreenState extends ConsumerState<VideosListScreen> {
     );
   }
 
-  Widget _buildErrorState(BuildContext context) {
-    return Center(
-      child: FadeIn(
-        duration: const Duration(milliseconds: 800),
-        child: Container(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(60),
-                ),
-                child: Icon(
-                  Icons.error_outline,
-                  size: 60,
-                  color: Colors.white.withValues(alpha: 0.7),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Something went wrong',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Unable to load videos. Please check your internet connection and try again.',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.8),
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: () {
-                  ref.invalidate(videosByCategoryProvider(widget.category));
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: AppColors.primaryGreen,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
-                ),
-                child: const Text('Try Again'),
-              ),
-            ],
-          ),
-        ),
-      ),
+  Widget _buildErrorState() {
+    return VideoNetworkErrorWidget(
+      onRetry: () {
+        ref.invalidate(videosByCategoryProvider(widget.category));
+      },
     );
   }
 

@@ -3,21 +3,55 @@ import 'dart:io';
 
 import '../../../../core/config/app_config.dart';
 import '../../../../core/services/firebase_service.dart';
+import '../../../../core/services/local_storage_service.dart';
 
 class CommunityRepository {
   final FirebaseService _firebaseService;
+  final LocalStorageService _localStorage; // ✅ ADD THIS
 
-  CommunityRepository(this._firebaseService);
+  CommunityRepository(this._firebaseService, this._localStorage);
 
-  Stream<List<Map<String, dynamic>>> getPosts() {
+  // Stream<List<Map<String, dynamic>>> getPosts() {
+  //   try {
+  //     return _firebaseService.listenToCollection(
+  //       AppConfig.postsCollection,
+  //       orderBy: 'createdAt',
+  //       descending: true,
+  //       limit: 50,
+  //     ).map((snapshot) {
+  //       return snapshot.docs.map((doc) {
+  //         final data = doc.data() as Map<String, dynamic>;
+  //         return {
+  //           'id': doc.id,
+  //           ...data,
+  //           'createdAt': (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+  //           'updatedAt': (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+  //         };
+  //       }).toList();
+  //     });
+  //   } catch (e) {
+  //     return Stream.value(_getMockPosts());
+  //   }
+  // }
+
+  Future<List<Map<String, dynamic>>> getCachedPosts() async {
+    return _localStorage.getCachedPosts();
+  }
+
+  Stream<List<Map<String, dynamic>>> getPosts() async* {
+    final cachedPosts = await getCachedPosts();
+    if (cachedPosts.isNotEmpty) {
+      yield cachedPosts;
+    }
+
     try {
-      return _firebaseService.listenToCollection(
+      final stream = _firebaseService.listenToCollection(
         AppConfig.postsCollection,
         orderBy: 'createdAt',
         descending: true,
         limit: 50,
       ).map((snapshot) {
-        return snapshot.docs.map((doc) {
+        final posts = snapshot.docs.map((doc) {
           final data = doc.data() as Map<String, dynamic>;
           return {
             'id': doc.id,
@@ -26,9 +60,14 @@ class CommunityRepository {
             'updatedAt': (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
           };
         }).toList();
+
+        _localStorage.setCachedPosts(posts);
+        return posts;
       });
+
+      yield* stream;
     } catch (e) {
-      return Stream.value(_getMockPosts());
+      yield cachedPosts;
     }
   }
 
@@ -368,50 +407,6 @@ class CommunityRepository {
 
       print('Failed to create notification: $e');
     }
-  }
-
-  List<Map<String, dynamic>> _getMockPosts() {
-    return [
-      {
-        'id': 'mock_post_1',
-        'content': 'Just harvested my first batch of tomatoes this season! The weather has been perfect for growing. 🍅',
-        'authorId': 'mock_user_1',
-        'authorName': 'John Farmer',
-        'authorAvatar': '',
-        'imageUrl': '',
-        'likesCount': 15,
-        'commentsCount': 3,
-        'likedBy': <String>[],
-        'createdAt': DateTime.now().subtract(const Duration(hours: 2)),
-        'updatedAt': DateTime.now().subtract(const Duration(hours: 2)),
-      },
-      {
-        'id': 'mock_post_2',
-        'content': 'Does anyone have tips for dealing with aphids on cucumber plants? Mine are getting attacked! 🥒',
-        'authorId': 'mock_user_2',
-        'authorName': 'Sarah Green',
-        'authorAvatar': '',
-        'imageUrl': '',
-        'likesCount': 8,
-        'commentsCount': 12,
-        'likedBy': <String>[],
-        'createdAt': DateTime.now().subtract(const Duration(hours: 5)),
-        'updatedAt': DateTime.now().subtract(const Duration(hours: 5)),
-      },
-      {
-        'id': 'mock_post_3',
-        'content': 'Amazing sunrise over the cornfield this morning. Nothing beats farm life! 🌅',
-        'authorId': 'mock_user_3',
-        'authorName': 'Mike Fields',
-        'authorAvatar': '',
-        'imageUrl': '',
-        'likesCount': 42,
-        'commentsCount': 8,
-        'likedBy': <String>[],
-        'createdAt': DateTime.now().subtract(const Duration(hours: 8)),
-        'updatedAt': DateTime.now().subtract(const Duration(hours: 8)),
-      },
-    ];
   }
 
   Future<String> createComment({

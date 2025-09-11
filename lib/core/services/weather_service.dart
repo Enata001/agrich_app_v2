@@ -15,7 +15,7 @@ class WeatherService {
     _dio.interceptors.add(LogInterceptor(
       requestBody: false,
       responseBody: false,
-      logPrint: (obj) => print('Weather API: $obj'),
+      logPrint: (obj) => ('Weather API: $obj'),
     ));
   }
 
@@ -165,7 +165,7 @@ class WeatherService {
 
   Map<String, dynamic> _formatWeatherData(Map<String, dynamic> data) {
     try {
-      print('Formatting weather data: $data'); // Debug log
+      
 
       // Safely extract nested data with null checks
       final main = data['main'] as Map<String, dynamic>? ?? {};
@@ -203,13 +203,13 @@ class WeatherService {
         'uvIndex': 6.0, // Default UV index as it's not in basic weather API
       };
 
-      print('Successfully formatted weather data: $formattedData'); // Debug log
+      
       return formattedData;
 
     } catch (e, stackTrace) {
-      print('Error formatting weather data: $e');
-      print('Stack trace: $stackTrace');
-      print('Raw data causing error: $data');
+      
+      
+      
 
       // Return default weather data if formatting fails
       return {
@@ -455,11 +455,11 @@ class WeatherService {
   // Error handling
   Map<String, dynamic> _handleDioError(DioException e) {
     if (e.response?.statusCode == 401) {
-      return _getDefaultWeatherData('Invalid API key');
+      return getDefaultWeatherData('Invalid API key');
     } else if (e.response?.statusCode == 404) {
-      return _getDefaultWeatherData('Location not found');
+      return getDefaultWeatherData('Location not found');
     } else {
-      return _getDefaultWeatherData('Network error');
+      return getDefaultWeatherData('Network error');
     }
   }
 
@@ -468,7 +468,7 @@ class WeatherService {
   }
 
   // Fallback data
-  Map<String, dynamic> _getDefaultWeatherData([String? error]) {
+  Map<String, dynamic> getDefaultWeatherData([String? error]) {
     return {
       'temperature': 25.0,
       'feelsLike': 27.0,

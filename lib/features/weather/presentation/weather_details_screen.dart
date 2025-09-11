@@ -35,7 +35,7 @@ class _WeatherDetailsScreenState extends ConsumerState<WeatherDetailsScreen>
   @override
   Widget build(BuildContext context) {
     final currentWeather = ref.watch(currentWeatherProvider);
-    final forecast = ref.watch(weatherForecastProvider);
+    final forecast = ref.watch(weatherForecastProvider(5));
     final dailyForecast = ref.watch(dailyWeatherForecastProvider);
 
     return GradientBackground(
@@ -340,6 +340,27 @@ class _WeatherDetailsScreenState extends ConsumerState<WeatherDetailsScreen>
       ),
     );
   }
+  DateTime _parseToDateTime(dynamic value) {
+    if (value == null) return DateTime.now();
+
+    if (value is int) {
+      // It's a UNIX timestamp in seconds
+      return DateTime.fromMillisecondsSinceEpoch(value * 1000);
+    }
+
+    if (value is double) {
+      // If it came as double
+      return DateTime.fromMillisecondsSinceEpoch(value.toInt() * 1000);
+    }
+
+    if (value is DateTime) {
+      // Already parsed
+      return value;
+    }
+
+    // fallback
+    return DateTime.now();
+  }
 
   Widget _buildWeatherHighlights(Map<String, dynamic> weather) {
     return GridView.count(
@@ -478,8 +499,7 @@ class _WeatherDetailsScreenState extends ConsumerState<WeatherDetailsScreen>
 
   Widget _buildDailyForecastCard(Map<String, dynamic> day, bool isToday) {
     final date = day['timestamp'] as DateTime? ?? DateTime.now();
-    final maxTemp = _getTemperature(day, 'maxTemp');
-    final minTemp = _getTemperature(day, 'minTemp');
+    final temp = _getTemperature(day);
     final description = day['description'] ?? '';
     final iconCode = day['icon'] ?? '01d';
 
@@ -539,19 +559,11 @@ class _WeatherDetailsScreenState extends ConsumerState<WeatherDetailsScreen>
               Row(
                 children: [
                   Text(
-                    '${maxTemp.toInt()}°',
+                    '${temp.toStringAsPrecision(3)}°',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${minTemp.toInt()}°',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.7),
-                      fontSize: 16,
                     ),
                   ),
                 ],
@@ -629,8 +641,8 @@ class _WeatherDetailsScreenState extends ConsumerState<WeatherDetailsScreen>
   }
 
   Widget _buildSunMoonTimes(Map<String, dynamic> weather) {
-    final sunrise = DateTime.fromMillisecondsSinceEpoch((weather['sunrise'] ?? 0) * 1000);
-    final sunset = DateTime.fromMillisecondsSinceEpoch((weather['sunset'] ?? 0) * 1000);
+    final sunrise = _parseToDateTime(weather['sunrise']);
+    final sunset = _parseToDateTime(weather['sunset']);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -758,12 +770,30 @@ class _WeatherDetailsScreenState extends ConsumerState<WeatherDetailsScreen>
   // Helper Methods
   double _getTemperature(Map<String, dynamic> weather, [String key = 'temperature']) {
     final temp = weather[key];
+
+    // Handle nested OpenWeatherMap daily structure
+    if (temp == null && weather['temp'] != null) {
+      final nested = weather['temp'];
+      if (nested is Map<String, dynamic>) {
+        if (key == 'minTemp' && nested['min'] != null) {
+          return nested['min'].toDouble();
+        }
+        if (key == 'maxTemp' && nested['max'] != null) {
+          return nested['max'].toDouble();
+        }
+        if (key == 'temperature' && nested['day'] != null) {
+          return nested['day'].toDouble();
+        }
+      }
+    }
+
     if (temp == null) return 0.0;
     if (temp is double) return temp;
     if (temp is int) return temp.toDouble();
     if (temp is String) return double.tryParse(temp) ?? 0.0;
     return 0.0;
   }
+
 
   IconData _getWeatherIcon(int hour) {
     if (hour >= 6 && hour < 18) {

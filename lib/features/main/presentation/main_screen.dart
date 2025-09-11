@@ -94,6 +94,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       extendBody: true,
       body: PageView(
         controller: _pageController,
+        physics: const NeverScrollableScrollPhysics(),
         onPageChanged: (index) {
           ref.read(mainScreenIndexProvider.notifier).state = index;
         },

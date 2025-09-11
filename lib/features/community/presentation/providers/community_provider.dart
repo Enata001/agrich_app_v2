@@ -1,26 +1,80 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
+import '../../../../core/services/connectivity_service.dart';
+import '../../../../core/services/network_service.dart' hide networkServiceProvider;
 
-// Community Posts Provider
-final communityPostsProvider = StreamProvider<List<Map<String, dynamic>>>((ref)  {
+final communityPostsProvider = StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) async* {
+  final networkService = ref.watch(networkServiceProvider);
   final communityRepository = ref.watch(communityRepositoryProvider);
-  return communityRepository.getPosts();
+
+  // Yield cached posts first
+  final cachedPosts = await communityRepository.getCachedPosts();
+  if (cachedPosts.isNotEmpty) {
+    yield cachedPosts;
+  }
+
+  // Check connectivity
+  final isConnected = await networkService.checkConnectivity();
+  if (!isConnected) {
+    if (cachedPosts.isEmpty) {
+      yield []; // No cache, no connection
+    }
+    return;
+  }
+
+  try {
+    // Timeout only on first emission
+    final firstPosts = await communityRepository.getPosts().first.timeout(const Duration(seconds: 15));
+    yield firstPosts;
+
+    // Continue streaming updates
+    yield* communityRepository.getPosts();
+  } catch (e) {
+    final fallback = await communityRepository.getCachedPosts();
+    yield fallback;
+  }
+});
+// ✅ Post Details Provider with auto-dispose
+final postDetailsProvider = FutureProvider.autoDispose.family<Map<String, dynamic>?, String>((ref, postId) async {
+  final networkService = ref.watch(networkServiceProvider);
+  final communityRepository = ref.watch(communityRepositoryProvider);
+
+  if (!await networkService.checkConnectivity()) {
+    throw NetworkException('Post details require internet connection');
+  }
+
+  try {
+    return await communityRepository.getPostDetails(postId).timeout(
+      const Duration(seconds: 10),
+    );
+  } catch (e) {
+    if (e is NetworkException) rethrow;
+    throw Exception('Failed to load post details');
+  }
 });
 
-// Post Details Provider
-final postDetailsProvider = FutureProvider.family<Map<String, dynamic>?, String>((ref, postId) async {
+// ✅ Post Comments Provider with auto-dispose
+final postCommentsProvider = StreamProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, postId) async* {
+  final networkService = ref.watch(networkServiceProvider);
   final communityRepository = ref.watch(communityRepositoryProvider);
-  return await communityRepository.getPostDetails(postId);
+
+  if (!await networkService.checkConnectivity()) {
+    yield [];
+    return;
+  }
+
+  try {
+    yield* communityRepository.getPostComments(postId).timeout(
+      const Duration(seconds: 12),
+      onTimeout: (sink) => sink.add([]),
+    );
+  } catch (e) {
+    yield [];
+  }
 });
 
-// Post Comments Provider
-final postCommentsProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, postId) {
-  final communityRepository = ref.watch(communityRepositoryProvider);
-  return communityRepository.getPostComments(postId);
-});
-
-// Like Post Provider
-final likePostProvider = StateNotifierProvider<LikePostNotifier, LikePostState>((ref) {
+// ✅ Like Post Provider with auto-dispose
+final likePostProvider = StateNotifierProvider.autoDispose<LikePostNotifier, LikePostState>((ref) {
   final communityRepository = ref.watch(communityRepositoryProvider);
   return LikePostNotifier(communityRepository);
 });

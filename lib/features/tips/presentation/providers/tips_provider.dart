@@ -3,11 +3,12 @@ import '../../../../core/providers/app_providers.dart';
 
 // Daily Tip Provider - Single source of truth
 final dailyTipProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  // ref.keepAlive();
   final tipsRepository = ref.watch(tipsRepositoryProvider);
   try {
+    print("Trying here first");
     return await tipsRepository.getDailyTip();
   } catch (e) {
-    // Return a fallback tip if there's an error
     return {
       'id': 'fallback_daily_tip',
       'title': 'Daily Farming Tip',
@@ -23,36 +24,106 @@ final dailyTipProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   }
 });
 
-// All Tips Provider
-final allTipsProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
+final allTipsProvider = StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) async* {
+  final networkService = ref.watch(networkServiceProvider);
   final tipsRepository = ref.watch(tipsRepositoryProvider);
+
+  // Yield cached tips first
+  final cachedTips = await tipsRepository.getCachedTips();
+  if (cachedTips.isNotEmpty) {
+    yield cachedTips;
+  }
+
+  // Check network connectivity
+  final isConnected = await networkService.checkConnectivity();
+  if (!isConnected) {
+    if (cachedTips.isEmpty) {
+      yield [];
+    }
+    return;
+  }
+
   try {
-    return tipsRepository.getAllTips();
+    // Timeout only on first emission
+    final firstTips = await tipsRepository.getAllTips().first.timeout(const Duration(seconds: 12));
+    yield firstTips;
+
+    // Continue streaming updates
+    yield* tipsRepository.getAllTips();
   } catch (e) {
     print('Error loading tips: $e');
-    return Stream.empty();
+    final fallback = await tipsRepository.getCachedTips();
+    yield fallback;
   }
 });
-
-// Tips by Category Provider
-final tipsByCategoryProvider = StreamProvider.family<List<Map<String, dynamic>>, String>((ref, category) {
+// ✅ FIXED: Tips by Category Provider with auto-dispose
+final tipsByCategoryProvider = StreamProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, category) async* {
+  final networkService = ref.watch(networkServiceProvider);
   final tipsRepository = ref.watch(tipsRepositoryProvider);
+
+  // First yield cached data for this category
+  final cachedTips = await tipsRepository.getCachedTipsByCategory(category);
+  if (cachedTips.isNotEmpty) {
+    yield cachedTips;
+  }
+
+  final isConnected = await networkService.checkConnectivity();
+  if (!isConnected) {
+    if (cachedTips.isEmpty) {
+      yield [];
+    }
+    return;
+  }
+
   try {
     if (category == 'all') {
-      return tipsRepository.getAllTips();
+      yield* tipsRepository.getAllTips().timeout(
+        const Duration(seconds: 12),
+        onTimeout: (sink) async {
+          final cached = await tipsRepository.getCachedTips();
+          sink.add(cached);
+        },
+      );
+    } else {
+      yield* tipsRepository.getTipsByCategory(category).timeout(
+        const Duration(seconds: 12),
+        onTimeout: (sink) async {
+          final cached = await tipsRepository.getCachedTipsByCategory(category);
+          sink.add(cached);
+        },
+      );
     }
-    return tipsRepository.getTipsByCategory(category);
   } catch (e) {
     print('Error loading tips for category $category: $e');
-    return Stream.empty();
+    final cached = await tipsRepository.getCachedTipsByCategory(category);
+    yield cached;
   }
 });
 
-// Tips Categories Provider
+// ✅ Tips Categories Provider - Future provider since categories don't change often
 final tipsCategoriesProvider = FutureProvider<List<String>>((ref) async {
+  final networkService = ref.watch(networkServiceProvider);
   final tipsRepository = ref.watch(tipsRepositoryProvider);
+
   try {
-    return await tipsRepository.getTipCategories();
+    if (await networkService.checkConnectivity()) {
+      return await tipsRepository.getTipCategories().timeout(
+        const Duration(seconds: 8),
+      );
+    } else {
+      // Return default categories when offline
+      return [
+        'all',
+        'planting',
+        'watering',
+        'pest control',
+        'harvesting',
+        'soil care',
+        'fertilization',
+        'crop rotation',
+        'seasonal',
+      ];
+    }
   } catch (e) {
     // Return default categories if there's an error
     return [
@@ -68,7 +139,6 @@ final tipsCategoriesProvider = FutureProvider<List<String>>((ref) async {
     ];
   }
 });
-
 // Search Tips Provider
 final searchTipsProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, query) async {
   if (query.isEmpty) return [];

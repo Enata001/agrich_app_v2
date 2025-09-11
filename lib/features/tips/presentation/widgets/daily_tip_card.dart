@@ -50,7 +50,9 @@ class _DailyTipCardState extends ConsumerState<DailyTipCard>
     final dailyTipAsync = ref.watch(dailyTipProvider);
 
     return dailyTipAsync.when(
-      data: (tip) => _buildCompactTipCard(context, tip),
+      data: (tip) {
+        return _buildCompactTipCard(context, tip);
+      },
       loading: () => _buildLoadingCard(),
       error: (error, stack) => _buildErrorCard(context, error),
     );
@@ -60,7 +62,7 @@ class _DailyTipCardState extends ConsumerState<DailyTipCard>
     final title = tip['title'] as String? ?? 'Daily Farming Tip';
     final content = tip['content'] as String? ?? 'No tip available today';
     final category = tip['category'] as String? ?? 'general';
-    final createdAt = tip['createdAt'] as DateTime? ?? DateTime.now();
+    final createdAt = DateTime.parse(tip['createdAt']);
 
     return GestureDetector(
       onTap: widget.onTap ?? () => _handleTap(context, tip),

@@ -159,9 +159,10 @@ class _PhoneSignInScreenState extends ConsumerState<PhoneSignInScreen> {
               controller: _phoneController,
               hint: 'Enter your phone number',
               onChanged: (phone) {
-                // setState(() {
+                setState(() {
                   _fullPhoneNumber = phone;
-                // });
+                });
+                print(_fullPhoneNumber);
               },
               // validator: (value) {
               //   if (value == null || value.isEmpty) {
@@ -214,11 +215,10 @@ class _PhoneSignInScreenState extends ConsumerState<PhoneSignInScreen> {
       delay: const Duration(milliseconds: 400),
       child: CustomButton(
         text: _isLoading ? 'Sending Code...' : 'Continue',
-        onPressed: _phoneController.text.isNotEmpty && !_isLoading ? _handleContinue : null,
+        onPressed: _fullPhoneNumber.length > 7 && !_isLoading ? _handleContinue : null,
         isLoading: _isLoading,
         width: double.infinity,
-        backgroundColor: Colors.white,
-        textColor: AppColors.primaryGreen,
+
       ),
     );
   }
@@ -232,7 +232,7 @@ class _PhoneSignInScreenState extends ConsumerState<PhoneSignInScreen> {
           Expanded(
             child: Container(
               height: 1,
-              color: Colors.white.withValues(alpha: 0.3),
+              color: Theme.of(context).dividerColor,
             ),
           ),
           Padding(
@@ -240,7 +240,7 @@ class _PhoneSignInScreenState extends ConsumerState<PhoneSignInScreen> {
             child: Text(
               'OR',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: Theme.of(context).dividerColor,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -248,7 +248,7 @@ class _PhoneSignInScreenState extends ConsumerState<PhoneSignInScreen> {
           Expanded(
             child: Container(
               height: 1,
-              color: Colors.white.withValues(alpha: 0.3),
+              color: Theme.of(context).dividerColor,
             ),
           ),
         ],
@@ -265,7 +265,7 @@ class _PhoneSignInScreenState extends ConsumerState<PhoneSignInScreen> {
         onPressed: () => context.pop(), // Go back to main auth screen
         variant: ButtonVariant.outlined,
         width: double.infinity,
-        textColor: Colors.white,
+        // textColor: Colors.white,
         icon: const Icon(Icons.email_outlined),
       ),
     );

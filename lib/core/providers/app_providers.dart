@@ -14,6 +14,7 @@ import '../../features/chat/data/repositories/chat_repository.dart';
 import '../router/app_router.dart';
 import '../services/local_storage_service.dart';
 import '../services/firebase_service.dart';
+import '../services/network_service.dart';
 import '../services/weather_service.dart';
 import '../services/chatbot_service.dart';
 import '../../features/auth/data/repositories/auth_repository.dart';
@@ -48,6 +49,12 @@ final firestoreProvider = Provider<FirebaseFirestore>((ref) {
 
 final firebaseStorageProvider = Provider<FirebaseStorage>((ref) {
   return FirebaseStorage.instance;
+});
+
+final networkServiceProvider = Provider<NetworkService>((ref) {
+  final service = NetworkService();
+  ref.onDispose(() => service.dispose());
+  return service;
 });
 
 final firebaseServiceProvider = Provider<FirebaseService>((ref) {
@@ -87,18 +94,21 @@ final videosRepositoryProvider = Provider<VideosRepository>((ref) {
 
 final communityRepositoryProvider = Provider<CommunityRepository>((ref) {
   final firebaseService = ref.watch(firebaseServiceProvider);
-  return CommunityRepository(firebaseService);
+  final localStorageService = ref.watch(localStorageServiceProvider);
+  return CommunityRepository(firebaseService, localStorageService);
 });
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   final firebaseService = ref.watch(firebaseServiceProvider);
-  return ChatRepository(firebaseService);
+  final localStorageService = ref.watch(localStorageServiceProvider);
+  return ChatRepository(firebaseService, ref, localStorageService);
 });
 
 final weatherRepositoryProvider = Provider<WeatherRepository>((ref) {
   final weatherService = ref.watch(weatherServiceProvider);
   final localStorage = ref.watch(localStorageServiceProvider);
-  return WeatherRepository(weatherService, localStorage);
+  final networkService = ref.watch(networkServiceProvider);
+  return WeatherRepository(weatherService, localStorage, networkService);
 });
 
 final tipsRepositoryProvider = Provider<TipsRepository>((ref) {

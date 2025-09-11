@@ -4,6 +4,7 @@ import 'package:animate_do/animate_do.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/services/location_service.dart';
+import '../../../../core/services/network_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../providers/weather_provider.dart';
 
@@ -22,35 +23,40 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
     final weatherAsync = ref.watch(currentWeatherProvider);
     final farmingAdviceAsync = ref.watch(farmingAdviceProvider);
     final isFarmingGood = ref.watch(isFarmingWeatherGoodProvider);
+    final networkStatus = ref.watch(networkStatusProvider);
 
-    return weatherAsync.when(
-      data: (weather) {
-        // Debug: Print the entire weather object to see its structure
-        print('Full weather data: $weather');
+    return networkStatus.when(
+      data: (data) => weatherAsync.when(
+        data: (weather) {
+          // Debug: Print the entire weather object to see its structure
+          print('Full weather data: $weather');
 
-        // Safe temperature extraction with proper type handling
-        final temperature = _getTemperature(weather);
-        print('Extracted temperature: $temperature');
+          // Safe temperature extraction with proper type handling
+          final temperature = _getTemperature(weather);
+          print('Extracted temperature: $temperature');
 
-        return _buildWeatherCard(
-          context,
-          weather,
-          farmingAdviceAsync,
-          isFarmingGood,
-        );
-      },
+          return _buildWeatherCard(
+            context,
+            weather,
+            farmingAdviceAsync,
+            isFarmingGood,
+          );
+        },
+        loading: () => _buildLoadingCard(),
+        error: (error, stack) {
+          print('Weather error: $error');
+          if (error.toString().contains('permission') &&
+              !_hasShownPermissionDialog) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _hasShownPermissionDialog = true;
+              LocationService.showLocationPermissionDialog(context);
+            });
+          }
+          return _buildErrorCard(context, error);
+        },
+      ),
+      error: (error, stackTrace) => _buildErrorCard(context, error),
       loading: () => _buildLoadingCard(),
-      error: (error, stack) {
-        print('Weather error: $error');
-        if (error.toString().contains('permission') &&
-            !_hasShownPermissionDialog) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _hasShownPermissionDialog = true;
-            LocationService.showLocationPermissionDialog(context);
-          });
-        }
-        return _buildErrorCard(context, error);
-      },
     );
   }
 
@@ -106,8 +112,6 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
                   ),
                 ),
               ),
-
-
 
               // Main content
               Padding(
@@ -352,26 +356,24 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
       duration: const Duration(milliseconds: 800),
       child: Container(
         height: 200,
-        margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.all(24),
+        width: double.infinity,
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
             colors: [
               AppColors.primaryGreen.withValues(alpha: 0.6),
-              AppColors.primaryGreen.withValues(alpha: 0.4),
+              Colors.grey.withValues(alpha: 0.2),
+              AppColors.primaryGreen.withValues(alpha: 0.6),
             ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primaryGreen.withValues(alpha: 0.2),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.5),
+            width: 1,
+          ),
         ),
+
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [

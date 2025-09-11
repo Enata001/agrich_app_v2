@@ -1,3 +1,5 @@
+import 'package:agrich_app_v2/core/router/app_router.dart';
+import 'package:agrich_app_v2/features/auth/data/models/user_model.dart';
 import 'package:agrich_app_v2/features/chat/presentation/widgets/chat_shimmer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +15,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../shared/widgets/custom_input_field.dart';
 import '../../shared/widgets/gradient_background.dart';
+import '../../shared/widgets/network_error_widget.dart';
 import 'providers/chat_provider.dart';
 
 class ChatListScreen extends ConsumerStatefulWidget {
@@ -58,7 +61,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
               child: userChats.when(
                 data: (chats) => _filteredChats(chats).isEmpty
                     ? _buildEmptyState(context)
-                    : _buildChatsList(context, _filteredChats(chats)),
+                    : _buildChatsList(_filteredChats(chats)),
                 loading: () => _buildLoadingState(),
                 error: (error, stack) => _buildErrorState(context),
               ),
@@ -176,7 +179,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
   }
 
   Widget _buildChatsList(
-    BuildContext context,
     List<Map<String, dynamic>> chats,
   ) {
     return RefreshIndicator(
@@ -193,13 +195,9 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
         itemCount: chats.length,
         itemBuilder: (context, index) {
           final chat = chats[index];
-          return FadeInUp(
-            duration: const Duration(milliseconds: 600),
-            delay: Duration(milliseconds: 300 + (index * 100)),
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: _buildChatItem(context, chat),
-            ),
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: _buildChatItem(context, chat),
           );
         },
       ),
@@ -207,6 +205,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
   }
 
   Widget _buildChatItem(BuildContext context, Map<String, dynamic> chat) {
+    print( chat);
     final recipientName = chat['recipientName'] as String? ?? 'Unknown User';
     final recipientAvatar = chat['recipientAvatar'] as String? ?? '';
     final lastMessage = chat['lastMessage'] as String? ?? '';
@@ -469,6 +468,38 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
   }
 
   Widget _buildErrorState(BuildContext context) {
+    // ✅ ADD NETWORK-AWARE ERROR HANDLING
+    return NetworkErrorWidget(
+      title: 'Unable to load conversations',
+      message: 'Please check your internet connection and try again.',
+      onRetry: () {
+        final currentUser = ref.read(currentUserProvider);
+        if (currentUser != null) {
+          ref.invalidate(userChatsProvider(currentUser.uid));
+        }
+      },
+      showOfflineData: true,
+      offlineWidget: _buildOfflineChatsContent(),
+    );
+  }
+
+  Widget _buildOfflineChatsContent() {
+    final user = ref.watch(currentUserProvider);
+    if (user == null) return _buildEmptyState(context);
+
+    final chatRepository = ref.read(chatRepositoryProvider);
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: chatRepository.getCachedUserChats(user.uid),
+      builder: (context, snapshot) {
+        if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+          return _buildChatsList(snapshot.data!);
+        }
+        return _buildError(context);
+      },
+    );
+  }
+
+  Widget _buildError(BuildContext context) {
     return Center(
       child: FadeIn(
         duration: const Duration(milliseconds: 800),
@@ -532,13 +563,14 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
   }
 
   void _openChat(BuildContext context, Map<String, dynamic> chat) {
-    context.push(
-      '${AppRoutes.chat}/${chat['recipientId']}',
-      extra: {
-        'recipientName': chat['recipientName'],
-        'recipientAvatar': chat['recipientAvatar'],
-      },
-    );
+    // context.push(
+    //   AppRoutes.chat,
+    //   extra: {
+    //     'chatId': chatId,
+    //     'recipientName': user['username'] ?? 'Unknown User',
+    //     'recipientAvatar': user['profilePictureUrl'] ?? '',
+    //   },
+    // );
   }
 
   void _openChatbot(BuildContext context) {
@@ -624,11 +656,11 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
         }
 
         final users = snapshot.data!;
-        final currentUser = ref.read(currentUserProvider);
+        final currentUser = UserModel.fromMap(ref.read(localStorageServiceProvider).getUserData() ?? {});
 
         // Filter out current user
         final otherUsers = users
-            .where((user) => user['id'] != currentUser?.uid)
+            .where((user) => user['id'] != currentUser.id)
             .toList();
 
         return ListView.builder(
@@ -638,43 +670,43 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
             final user = otherUsers[index];
             return ListTile(
               leading: CircleAvatar(
-                backgroundImage: user['photoURL']?.isNotEmpty == true
-                    ? CachedNetworkImageProvider(user['photoURL'])
+                backgroundImage: user['profilePictureUrl']?.isNotEmpty == true
+                    ? CachedNetworkImageProvider(user['profilePictureUrl'])
                     : null,
-                child: user['photoURL']?.isEmpty != false
-                    ? Text(user['displayName']?[0]?.toUpperCase() ?? 'U')
+                child: user['profilePictureUrl']?.isEmpty != false
+                    ? Text(user['username']?[0]?.toUpperCase() ?? 'U')
                     : null,
               ),
-              title: Text(user['displayName'] ?? 'Unknown User'),
+              title: Text(user['username'] ?? 'Unknown User'),
               subtitle: Text(user['bio'] ?? 'Farmer'),
-              onTap: () async {
-                Navigator.pop(context);
-                if (currentUser != null) {
+                onTap: () async {
+                  final messenger = ScaffoldMessenger.of(context); // ✅ capture before pop
+                  Navigator.pop(context);
+
                   try {
                     final chatId = await ref
                         .read(chatRepositoryProvider)
-                        .createOrGetChat([currentUser.uid, user['id']]);
+                        .createOrGetChat([currentUser.id, user['id']]);
 
                     if (mounted) {
-                      context.push(
+                      AppRouter.push(
                         AppRoutes.chat,
                         extra: {
                           'chatId': chatId,
-                          'recipientName':
-                              user['displayName'] ?? 'Unknown User',
-                          'recipientAvatar': user['photoURL'] ?? '',
+                          'recipientName': user['username'] ?? 'Unknown User',
+                          'recipientAvatar': user['profilePictureUrl'] ?? '',
                         },
                       );
                     }
                   } catch (e) {
+                    print(e);
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      messenger.showSnackBar( // ✅ use captured messenger
                         SnackBar(content: Text('Failed to start chat: $e')),
                       );
                     }
                   }
                 }
-              },
             );
           },
         );

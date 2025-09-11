@@ -1,13 +1,14 @@
-import 'package:agrich_app_v2/features/videos/presentation/widgets/video_thumbnail_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/router/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/network_service.dart'
+    hide networkServiceProvider;
+import '../../../../core/providers/app_providers.dart';
 import '../../../shared/widgets/loading_indicator.dart';
 import '../providers/video_provider.dart';
-
+import 'video_thumbnail_card.dart';
 
 class RecentVideosSection extends ConsumerWidget {
   const RecentVideosSection({super.key});
@@ -15,12 +16,13 @@ class RecentVideosSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final recentVideos = ref.watch(recentVideosProvider);
+    final networkStatus = ref.watch(networkStatusProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-
-
+        Row(
+          children: [
             Text(
               'Recently Watched',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -28,12 +30,41 @@ class RecentVideosSection extends ConsumerWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-
+            const Spacer(),
+            // ✅ Show network status for videos
+            networkStatus.when(
+              data: (isOnline) => isOnline
+                  ? const SizedBox.shrink()
+                  : Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.orange,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'OFFLINE',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
+            ),
+          ],
+        ),
         const SizedBox(height: 16),
         recentVideos.when(
-          data: (videos) => videos.isEmpty
-              ? _buildEmptyState(context)
-              : _buildVideosList(context, videos),
+          data: (videos) {
+            return videos.isEmpty
+                ? _buildEmptyState(context)
+                : _buildVideosList(context, ref, videos);
+          },
           loading: () => _buildLoadingState(),
           error: (error, stack) => _buildErrorState(context),
         ),
@@ -41,24 +72,27 @@ class RecentVideosSection extends ConsumerWidget {
     );
   }
 
-  Widget _buildVideosList(BuildContext context, List<Map<String, dynamic>> videos) {
+  Widget _buildVideosList(
+    BuildContext context,
+    WidgetRef ref,
+    List<Map<String, dynamic>> videos,
+  ) {
     return SizedBox(
-      height: 200,
-      child: ListView.builder(
+      height: 250,
+      child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: videos.length > 5 ? 5 : videos.length, // Show max 5 videos
-        padding: const EdgeInsets.only(right: 20),
+        itemCount: videos.length > 5 ? 5 : videos.length,
+        // Show max 5 videos
         itemBuilder: (context, index) {
           final video = videos[index];
-          return Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: VideoThumbnailCard(
-              video: video,
-              width: 280,
-              onTap: () => _playVideo(context, video),
-            ),
+          return VideoThumbnailCard(
+            video: video,
+            // width: 340,
+            onTap: () => _playVideo(context, ref, video),
           );
         },
+        separatorBuilder: (BuildContext context, int index) =>
+            Padding(padding: const EdgeInsets.only(right: 20)),
       ),
     );
   }
@@ -71,7 +105,6 @@ class RecentVideosSection extends ConsumerWidget {
           colors: [
             AppColors.primaryGreen.withValues(alpha: 0.6),
             Colors.grey.withValues(alpha: 0.2),
-
             AppColors.primaryGreen.withValues(alpha: 0.6),
           ],
           begin: Alignment.topLeft,
@@ -95,17 +128,19 @@ class RecentVideosSection extends ConsumerWidget {
             const SizedBox(height: 16),
             Text(
               'No videos watched yet',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.8),
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Start watching videos to see them here',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 14,
               ),
-              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -114,31 +149,9 @@ class RecentVideosSection extends ConsumerWidget {
   }
 
   Widget _buildLoadingState() {
-    return SizedBox(
+    return const SizedBox(
       height: 200,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: 3,
-        padding: const EdgeInsets.only(right: 20),
-        itemBuilder: (context, index) {
-          return Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Container(
-              width: 280,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Center(
-                child: LoadingIndicator(
-                  size: LoadingSize.small,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          );
-        },
-      ),
+      child: Center(child: LoadingIndicator()),
     );
   }
 
@@ -146,12 +159,9 @@ class RecentVideosSection extends ConsumerWidget {
     return Container(
       height: 200,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.2),
-          width: 1,
-        ),
+        color: Colors.red.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
       ),
       child: Center(
         child: Column(
@@ -160,26 +170,15 @@ class RecentVideosSection extends ConsumerWidget {
             Icon(
               Icons.error_outline,
               size: 48,
-              color: Colors.white.withValues(alpha: 0.6),
+              color: Colors.red.withValues(alpha: 0.7),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Text(
-              'Unable to load videos',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.white.withValues(alpha: 0.8),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () {
-                // TODO: Refresh videos
-              },
-              child: Text(
-                'Try Again',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  fontWeight: FontWeight.w500,
-                ),
+              'Error loading recent videos',
+              style: TextStyle(
+                color: Colors.red.withValues(alpha: 0.8),
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -188,12 +187,73 @@ class RecentVideosSection extends ConsumerWidget {
     );
   }
 
-  void _playVideo(BuildContext context, Map<String, dynamic> video) {
+  // ✅ FIXED: Play video with network check
+  void _playVideo(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> video,
+  ) async {
+    final networkService = ref.read(networkServiceProvider);
+    final isConnected = await networkService.checkConnectivity();
+
+    if (!isConnected) {
+      // Show network error for videos
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Videos require internet connection. Please check your network.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final videoId = video['id'] as String;
+
+    // ✅ Mark as watched again (updates watch order)
+    final localStorage = ref.read(localStorageServiceProvider);
+    final userData = localStorage.getUserData();
+    if (userData != null) {
+      final userId = userData['id'] as String;
+      await ref
+          .read(videosRepositoryProvider)
+          .markVideoAsWatched(videoId, userId);
+
+      // Refresh the recent videos list
+      ref.invalidate(recentVideosProvider);
+    }
+
+    // Determine if it's a YouTube video
+    final isYouTubeVideo =
+        video['isYouTubeVideo'] == true ||
+        video['youtubeVideoId'] != null ||
+        video['youtubeUrl'] != null;
+
+    // Navigate to video player with all necessary data
     context.push(
-      AppRoutes.videoPlayer,
+      '/video-player/$videoId',
       extra: {
-        'videoUrl': video['url'] ?? '',
-        'videoTitle': video['title'] ?? '',
+        'videoId': videoId,
+        'videoUrl': video['videoUrl'] ?? '',
+        'youtubeVideoId': video['youtubeVideoId'],
+        'youtubeUrl': video['youtubeUrl'],
+        'embedUrl': video['embedUrl'],
+        'videoTitle': video['title'] ?? 'Video',
+        'description': video['description'] ?? '',
+        'category': video['category'] ?? '',
+        'duration': video['duration'] ?? '0:00',
+        'views': video['views'] ?? 0,
+        'likes': video['likes'] ?? 0,
+        'likedBy': video['likedBy'] ?? [],
+        'authorName': video['authorName'] ?? '',
+        'authorId': video['authorId'] ?? '',
+        'authorAvatar': video['authorAvatar'],
+        'uploadDate': video['uploadDate'],
+        'thumbnailUrl': video['thumbnailUrl'] ?? '',
+        'isYouTubeVideo': isYouTubeVideo,
+        'commentsCount': video['commentsCount'] ?? 0,
+        'isActive': video['isActive'] ?? true,
       },
     );
   }

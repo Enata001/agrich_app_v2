@@ -13,6 +13,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../shared/widgets/gradient_background.dart';
 import '../../shared/widgets/loading_indicator.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../shared/widgets/network_error_widget.dart';
 import 'providers/community_provider.dart';
 import 'widgets/post_card.dart';
 
@@ -64,7 +65,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
               child: postsAsync.when(
                 data: (postsList) => _buildPostsList(context, postsList),
                 loading: () => _buildLoadingState(),
-                error: (error, stack) => _buildErrorState(context, error),
+                error: (error, stack) => _buildErrorState(error),
               ),
             ),
           ],
@@ -125,7 +126,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
       child: Container(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
         child: SafeArea(
-          child:CustomInputField(
+          child: CustomInputField(
             controller: _searchController,
             hint: "Search posts...",
             onChanged: (value) {
@@ -155,12 +156,12 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
             final filter = filters[index];
             final isSelected = filter == _currentFilter;
 
-
-
             return Container(
               margin: const EdgeInsets.only(right: 12),
               child: Theme(
-                data: Theme.of(context).copyWith(canvasColor: Colors.transparent),
+                data: Theme.of(
+                  context,
+                ).copyWith(canvasColor: Colors.transparent),
 
                 child: FilterChip(
                   label: Text(
@@ -182,12 +183,15 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                   backgroundColor: Colors.black26.withValues(alpha: 0.05),
                   selectedColor: Colors.white,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadiusGeometry.circular(20)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadiusGeometry.circular(20),
+                  ),
                   checkmarkColor: Colors.transparent,
                   side: BorderSide(
                     color: isSelected
-                      ? Colors.white
-                      : Colors.white.withValues(alpha: 0.2),),
+                        ? Colors.white
+                        : Colors.white.withValues(alpha: 0.2),
+                  ),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 8,
@@ -206,40 +210,36 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
       return _buildEmptyState(context);
     }
 
-    return FadeInUp(
-      duration: const Duration(milliseconds: 600),
-      delay: const Duration(milliseconds: 300),
-      child: Container(
-        margin: const EdgeInsets.only(top: 10),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: RefreshIndicator(
-          onRefresh: _refreshPosts,
-          color: AppColors.primaryGreen,
-          child: ListView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
-            // Extra bottom padding for FAB
-            itemCount: posts.length,
-            itemBuilder: (context, index) {
-              final post = posts[index];
-              return Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                child: PostCard(
-                  onLike: () => _likePost(post['id'] ?? ''),
-                  onTap: () => _navigateToPostDetails(context, post['id']),
-                  onComment: () =>
-                      _navigateToPostDetails(context, post['id'] ?? ''),
-                  onShare: () => _sharePost(post),
-                  onSave: () => _savePost(post['id'] ?? ''),
-                  onReport: () => _reportPost(post['id'] ?? ''),
-                  post: post,
-                ),
-              );
-            },
-          ),
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: RefreshIndicator(
+        onRefresh: _refreshPosts,
+        color: AppColors.primaryGreen,
+        child: ListView.builder(
+          controller: _scrollController,
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
+          // Extra bottom padding for FAB
+          itemCount: posts.length,
+          itemBuilder: (context, index) {
+            final post = posts[index];
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              child: PostCard(
+                onLike: () => _likePost(post['id'] ?? ''),
+                onTap: () => _navigateToPostDetails(context, post['id']),
+                onComment: () =>
+                    _navigateToPostDetails(context, post['id'] ?? ''),
+                onShare: () => _sharePost(post),
+                onSave: () => _savePost(post['id'] ?? ''),
+                onReport: () => _reportPost(post['id'] ?? ''),
+                post: post,
+              ),
+            );
+          },
         ),
       ),
     );
@@ -267,65 +267,26 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     );
   }
 
-  Widget _buildErrorState(BuildContext context, Object error) {
-    return FadeIn(
-      duration: const Duration(milliseconds: 600),
-      child: Container(
-        margin: const EdgeInsets.only(top: 40),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(40),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 80, color: Colors.red.shade400),
-                const SizedBox(height: 24),
-                Text(
-                  'Unable to load posts',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Please check your internet connection and try again.',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyLarge?.copyWith(color: Colors.grey.shade600),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    ref.invalidate(communityPostsProvider);
-                    if (_currentFilter != 'recent') {
-                      ref.invalidate(filteredPostsProvider(_currentFilter));
-                    }
-                    if (_searchQuery.isNotEmpty) {
-                      ref.invalidate(searchPostsProvider(_searchQuery));
-                    }
-                  },
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Try Again'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryGreen,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+  Widget _buildErrorState(Object error) {
+    return NetworkErrorWidget(
+      title: 'Unable to load posts',
+      message: 'Please check your internet connection and try again.',
+      onRetry: () => ref.invalidate(communityPostsProvider),
+      showOfflineData: true,
+      offlineWidget: _buildOfflineCommunityContent(),
+    );
+  }
+
+  Widget _buildOfflineCommunityContent() {
+    final communityRepository = ref.read(communityRepositoryProvider);
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: communityRepository.getCachedPosts(),
+      builder: (context, snapshot) {
+        if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+          return _buildPostsList(context, snapshot.data!);
+        }
+        return Center(child: Column(children: [Text('Please try again')]));
+      },
     );
   }
 
@@ -346,48 +307,45 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
 
   Widget _buildEmptyState(BuildContext context) {
     return Center(
-      child: FadeIn(
-        duration: const Duration(milliseconds: 800),
-        child: Container(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryGreen.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(60),
-                ),
-                child: Icon(
-                  _searchQuery.isNotEmpty
-                      ? Icons.search_off
-                      : Icons.people_outline,
-                  size: 60,
-                  color: AppColors.primaryGreen.withValues(alpha: 0.7),
-                ),
+      child: Container(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: AppColors.primaryGreen.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(60),
               ),
-              const SizedBox(height: 24),
-              Text(
-                _searchQuery.isNotEmpty ? 'No results found' : 'No posts yet',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
+              child: Icon(
                 _searchQuery.isNotEmpty
-                    ? 'Try searching with different keywords'
-                    : 'Be the first to share something with the community!',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(color: Colors.grey.shade600),
-                textAlign: TextAlign.center,
+                    ? Icons.search_off
+                    : Icons.people_outline,
+                size: 60,
+                color: AppColors.primaryGreen.withValues(alpha: 0.7),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              _searchQuery.isNotEmpty ? 'No results found' : 'No posts yet',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _searchQuery.isNotEmpty
+                  ? 'Try searching with different keywords'
+                  : 'Be the first to share something with the community!',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(color: Colors.grey.shade600),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );

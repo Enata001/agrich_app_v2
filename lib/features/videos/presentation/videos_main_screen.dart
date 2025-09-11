@@ -6,10 +6,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/services/network_service.dart' hide networkServiceProvider;
 import '../../../core/theme/app_colors.dart';
 import '../../auth/data/models/user_model.dart';
 import '../../shared/widgets/gradient_background.dart';
 import '../../shared/widgets/custom_input_field.dart';
+import '../../shared/widgets/network_error_widget.dart';
 import 'providers/video_provider.dart';
 import 'widgets/video_card.dart';
 
@@ -87,18 +89,11 @@ class _VideosMainScreenState extends ConsumerState<VideosMainScreen>
           child: Column(
             children: [
               // Animated Header
-              SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, -1),
-                  end: Offset.zero,
-                ).animate(_headerAnimation),
-                child: _buildHeader(context),
-              ),
+              _buildHeader(context),
+
 
               // Search Bar (when active)
               if (_showSearch) _buildSearchBar(),
-
-
 
               // Category Filter
               _buildCategoryFilter(),
@@ -190,7 +185,6 @@ class _VideosMainScreenState extends ConsumerState<VideosMainScreen>
       ),
     );
   }
-
 
   Widget _buildCategoryFilter() {
     final categories = ['All', ...AppConfig.videoCategories];
@@ -467,48 +461,16 @@ class _VideosMainScreenState extends ConsumerState<VideosMainScreen>
   }
 
   Widget _buildErrorState(Object error) {
-    return Center(
-      child: FadeIn(
-        duration: const Duration(milliseconds: 800),
-        child: Container(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 80,
-                color: AppColors.error.withValues(alpha: 0.7),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Unable to load videos',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Please check your connection and try again',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(color: Colors.grey.shade600),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () => _refreshVideos(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryGreen,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      ),
+    if (error is NetworkException) {
+      return VideoNetworkErrorWidget(
+        onRetry: () => _refreshVideos(),
+      );
+    }
+
+    return NetworkErrorWidget(
+      title: 'Unable to load videos',
+      message: 'Please check your connection and try again',
+      onRetry: () => _refreshVideos(),
     );
   }
 
@@ -588,53 +550,79 @@ class _VideosMainScreenState extends ConsumerState<VideosMainScreen>
     );
   }
 
-  void _playVideo(Map<String, dynamic> video){
+  void _playVideo(Map<String, dynamic> video) async {
+    final networkService = ref.read(networkServiceProvider);
+
+    // Check network connectivity first
+    if (!await networkService.checkConnectivity()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Videos require internet connection. Please check your network.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
     final videoId = video['id'] as String;
 
     // Track video as watched
-    final currentUser =UserModel.fromMap(ref.read(localStorageServiceProvider).getUserData()!);
-    ref.read(videosRepositoryProvider).markVideoAsWatched(videoId, currentUser.id);
+    final currentUser = UserModel.fromMap(
+      ref.read(localStorageServiceProvider).getUserData()!,
+    );
+    await ref
+        .read(videosRepositoryProvider)
+        .markVideoAsWatched(videoId, currentUser.id);
 
     // Determine if it's a YouTube video
-    final isYouTubeVideo = video['isYouTubeVideo'] == true ||
+    final isYouTubeVideo =
+        video['isYouTubeVideo'] == true ||
         video['youtubeVideoId'] != null ||
         video['youtubeUrl'] != null;
 
     // Navigate to video player with all necessary data
-    context.push('/video-player/$videoId', extra: {
-      'videoId': videoId,
-      'videoUrl': video['videoUrl'] ?? '',
-      'youtubeVideoId': video['youtubeVideoId'],
-      'youtubeUrl': video['youtubeUrl'],
-      'embedUrl': video['embedUrl'],
-      'videoTitle': video['title'] ?? 'Video',
-      'description': video['description'] ?? '',
-      'category': video['category'] ?? '',
-      'duration': video['duration'] ?? '0:00',
-      'views': video['views'] ?? 0,
-      'likes': video['likes'] ?? 0,
-      'likedBy': video['likedBy'] ?? [],
-      'authorName': video['authorName'] ?? '',
-      'authorId': video['authorId'] ?? '',
-      'authorAvatar': video['authorAvatar'],
-      'uploadDate': video['uploadDate'],
-      'thumbnailUrl': video['thumbnailUrl'] ?? '',
-      'isYouTubeVideo': isYouTubeVideo,
-      'commentsCount': video['commentsCount'] ?? 0,
-      'isActive': video['isActive'] ?? true,
-    });
+    context.push(
+      '/video-player/$videoId',
+      extra: {
+        'videoId': videoId,
+        'videoUrl': video['videoUrl'] ?? '',
+        'youtubeVideoId': video['youtubeVideoId'],
+        'youtubeUrl': video['youtubeUrl'],
+        'embedUrl': video['embedUrl'],
+        'videoTitle': video['title'] ?? 'Video',
+        'description': video['description'] ?? '',
+        'category': video['category'] ?? '',
+        'duration': video['duration'] ?? '0:00',
+        'views': video['views'] ?? 0,
+        'likes': video['likes'] ?? 0,
+        'likedBy': video['likedBy'] ?? [],
+        'authorName': video['authorName'] ?? '',
+        'authorId': video['authorId'] ?? '',
+        'authorAvatar': video['authorAvatar'],
+        'uploadDate': video['uploadDate'],
+        'thumbnailUrl': video['thumbnailUrl'] ?? '',
+        'isYouTubeVideo': isYouTubeVideo,
+        'commentsCount': video['commentsCount'] ?? 0,
+        'isActive': video['isActive'] ?? true,
+      },
+    );
   }
 
   void _toggleLikeVideo(Map<String, dynamic> video) {
     final videoId = video['id'] as String;
     // Track video as watched
-    final currentUser =UserModel.fromMap(ref.read(localStorageServiceProvider).getUserData()!);
+    final currentUser = UserModel.fromMap(
+      ref.read(localStorageServiceProvider).getUserData()!,
+    );
     ref.read(videosRepositoryProvider).likeVideo(videoId, currentUser.id);
   }
 
   void _toggleSaveVideo(Map<String, dynamic> video) {
     final videoId = video['id'] as String;
-    final currentUser =UserModel.fromMap(ref.read(localStorageServiceProvider).getUserData()!);
+    final currentUser = UserModel.fromMap(
+      ref.read(localStorageServiceProvider).getUserData()!,
+    );
     ref.read(videosRepositoryProvider).saveVideo(videoId, currentUser.id);
   }
 

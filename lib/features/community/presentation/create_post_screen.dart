@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:animate_do/animate_do.dart';
 import 'dart:io';
 
+import '../../../core/services/network_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../shared/widgets/custom_input_field.dart';
@@ -601,46 +602,62 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
 
 
   Future<void> _createPost(dynamic currentUser) async {
-    if (!_formKey.currentState!.validate() || currentUser == null) {
-      return;
-    }
+    final networkStatus = ref.read(networkStatusProvider);
 
-    setState(() {
-      _isLoading = true;
-    });
+    networkStatus.when(
+      data: (isOnline) async {
+        if (!isOnline) {
+          _showError('Cannot create post while offline');
+          return;
+        }
+        if (!_formKey.currentState!.validate() || currentUser == null) {
+          return;
+        }
 
-    try {
-      final communityRepository = ref.read(communityRepositoryProvider);
-
-      await communityRepository.createPost(
-        content: _contentController.text.trim(),
-        authorId: currentUser.uid,
-        authorName: currentUser.displayName ?? 'User',
-        authorAvatar: currentUser.photoURL ?? '',
-        imageFile: _selectedImage,
-        location: _selectedLocation?['name'],
-        tags: _tags,
-
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Post created successfully!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        context.pop(); // Go back to community screen
-      }
-    } catch (e) {
-      _showError('Failed to create post: $e');
-    } finally {
-      if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isLoading = true;
         });
-      }
-    }
+
+        try {
+          final communityRepository = ref.read(communityRepositoryProvider);
+
+          await communityRepository.createPost(
+            content: _contentController.text.trim(),
+            authorId: currentUser.uid,
+            authorName: currentUser.displayName ?? 'User',
+            authorAvatar: currentUser.photoURL ?? '',
+            imageFile: _selectedImage,
+            location: _selectedLocation?['name'],
+            tags: _tags,
+
+          );
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Post created successfully!'),
+                backgroundColor: AppColors.success,
+              ),
+            );
+            context.pop(); // Go back to community screen
+          }
+        } catch (e) {
+          _showError('Failed to create post: $e');
+        } finally {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+          }
+        }
+      },
+      loading: () => setState(() {
+        _isLoading = true;
+      }),
+      error: (_, __) => _showError('Network status unknown'),
+    );
+
+
   }
 
 

@@ -49,6 +49,7 @@ dependencies:
   flutter_dotenv: ^6.0.0
   youtube_player_flutter: ^9.1.2
   validators: ^3.0.0
+  connectivity_plus: ^6.1.5
 
 dev_dependencies:
   flutter_test:

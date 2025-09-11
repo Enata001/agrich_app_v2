@@ -1,5 +1,5 @@
-// lib/features/chat/presentation/chat_screen.dart
-
+import 'package:agrich_app_v2/core/services/network_service.dart';
+import 'package:agrich_app_v2/features/auth/data/models/user_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animate_do/animate_do.dart';
@@ -66,23 +66,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       });
 
       // Send typing indicator
-      final currentUser = ref.read(currentUserProvider);
-      if (currentUser != null) {
-        ref.read(chatRepositoryProvider).sendTypingIndicator(
-          widget.chatId,
-          currentUser.uid,
-          isTyping,
-        );
-      }
-    }
+      final currentUser = UserModel.fromMap(ref.read(localStorageServiceProvider).getUserData() ?? {});
+      ref.read(chatRepositoryProvider).sendTypingIndicator(
+        widget.chatId,
+        currentUser.id,
+        isTyping,
+      );
+        }
   }
 
   void _markMessagesAsRead() {
-    final currentUser = ref.read(currentUserProvider);
-    if (currentUser != null) {
-      ref.read(chatRepositoryProvider).markMessagesAsRead(widget.chatId, currentUser.uid);
+    final currentUser = UserModel.fromMap(ref.read(localStorageServiceProvider).getUserData() ?? {});
+    ref.read(chatRepositoryProvider).markMessagesAsRead(widget.chatId, currentUser.id);
     }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -484,38 +480,51 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _sendMessage(dynamic currentUser) async {
-    final content = _messageController.text.trim();
-    if (content.isEmpty || currentUser == null) return;
 
-    final messageData = {
-      'chatId': widget.chatId,
-      'senderId': currentUser.uid,
-      'senderName': currentUser.displayName ?? 'User',
-      'content': content,
-      'type': 'text',
-      'timestamp': DateTime.now().toIso8601String(),
-      'isRead': false,
-    };
 
-    // Clear input immediately for better UX
-    _messageController.clear();
-    setState(() {
-      _isTyping = false;
-    });
+    final networkStatus = ref.read(networkStatusProvider);
+    networkStatus.when(data: (online)async{
 
-    try {
-      await ref.read(chatRepositoryProvider).sendMessage(messageData);
+      final content = _messageController.text.trim();
+      if (content.isEmpty || currentUser == null) return;
 
-      // Scroll to bottom
-      _scrollToBottom();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to send message: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+      final messageData = {
+        'chatId': widget.chatId,
+        'senderId': currentUser.id,
+        'senderName': currentUser.displayName ?? 'User',
+        'content': content,
+        'type': 'text',
+        'timestamp': DateTime.now().toIso8601String(),
+        'isRead': false,
+      };
+
+      _messageController.clear();
+      setState(() {
+        _isTyping = false;
+      });
+      try {
+        await ref.read(chatRepositoryProvider).sendMessage(messageData);
+        _scrollToBottom();
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send message: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }, error:(error, stackTrace) =>   ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Failed to send message: Check your Internet connection'),
+        backgroundColor: Colors.red,
+      ),
+    ), loading: () {
+
+    },);
+
+
+
+
   }
 
   Future<void> _pickImage() async {
@@ -568,8 +577,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _sendImageMessage(File imageFile) async {
-    final currentUser = ref.read(currentUserProvider);
-    if (currentUser == null) return;
+    final currentUser = UserModel.fromMap(ref.read(localStorageServiceProvider).getUserData() ?? {});
 
     try {
       // Show loading indicator
@@ -585,8 +593,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
       final messageData = {
         'chatId': widget.chatId,
-        'senderId': currentUser.uid,
-        'senderName': currentUser.displayName ?? 'User',
+        'senderId': currentUser.id,
+        'senderName': currentUser.username,
         'content': _messageController.text.trim(),
         'type': 'image',
         'imageUrl': imageUrl,
@@ -672,36 +680,34 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              final currentUser = ref.read(currentUserProvider);
-              if (currentUser != null) {
-                try {
-                  // Extract recipient ID from chat participants
-                  final chatInfo = await ref.read(chatRepositoryProvider).getChatInfo(widget.chatId);
-                  final participants = List<String>.from(chatInfo?['participants'] ?? []);
-                  final recipientId = participants.firstWhere(
-                        (id) => id != currentUser.uid,
-                    orElse: () => '',
-                  );
+              final currentUser = UserModel.fromMap(ref.read(localStorageServiceProvider).getUserData() ?? {});
+              try {
+                // Extract recipient ID from chat participants
+                final chatInfo = await ref.read(chatRepositoryProvider).getChatInfo(widget.chatId);
+                final participants = List<String>.from(chatInfo?['participants'] ?? []);
+                final recipientId = participants.firstWhere(
+                      (id) => id != currentUser.id,
+                  orElse: () => '',
+                );
 
-                  if (recipientId.isNotEmpty) {
-                    await ref.read(chatRepositoryProvider).blockUser(currentUser.uid, recipientId);
+                if (recipientId.isNotEmpty) {
+                  await ref.read(chatRepositoryProvider).blockUser(currentUser.id, recipientId);
 
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('User blocked successfully')),
-                      );
-                      context.pop(); // Go back to chat list
-                    }
-                  }
-                } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to block user: $e')),
+                      const SnackBar(content: Text('User blocked successfully')),
                     );
+                    context.pop(); // Go back to chat list
                   }
                 }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to block user: $e')),
+                  );
+                }
               }
-            },
+                        },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Block'),
           ),

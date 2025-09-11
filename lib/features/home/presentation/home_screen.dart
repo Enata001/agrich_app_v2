@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animate_do/animate_do.dart';
 
+import '../../../core/services/network_service.dart';
 import '../../../core/theme/app_colors.dart';
 
 import '../../auth/providers/auth_provider.dart';
@@ -117,6 +118,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildWeatherSection() {
+    final networkStatus = ref.watch(networkStatusProvider);
     return FadeInUp(
       duration: const Duration(milliseconds: 600),
       delay: const Duration(milliseconds: 300),
@@ -139,6 +141,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                   ),
+                ),
+                const Spacer(),
+                // ✅ Show network status for videos
+                networkStatus.when(
+                  data: (isOnline) => isOnline
+                      ? const SizedBox.shrink()
+                      : Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.orange,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'OFFLINE',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
                 ),
               ],
             ),
@@ -189,7 +214,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       duration: const Duration(milliseconds: 600),
       delay: const Duration(milliseconds: 500),
       child: Container(
-
+        height: 300,
         margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

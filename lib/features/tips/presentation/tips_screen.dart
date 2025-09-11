@@ -1,4 +1,4 @@
-
+import 'package:agrich_app_v2/features/auth/providers/auth_provider.dart';
 import 'package:agrich_app_v2/features/tips/presentation/widgets/tip_details_modal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,7 +23,6 @@ class TipsScreen extends ConsumerStatefulWidget {
 
 class _TipsScreenState extends ConsumerState<TipsScreen>
     with AutomaticKeepAliveClientMixin {
-
   @override
   bool get wantKeepAlive => true;
 
@@ -66,13 +65,10 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
                     padding: const EdgeInsets.only(bottom: 20),
                     child: Column(
                       children: [
-                        // Fixed header section
                         _buildHeader(context),
                         const SizedBox(height: 10),
-                        // Collapsible featured tip section
-                        Flexible(
-                          child: _buildDailyTipSection(),
-                        ),
+
+                        Flexible(child: _buildDailyTipSection()),
                       ],
                     ),
                   ),
@@ -81,76 +77,97 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
                 ),
               ),
 
-              // Search Bar (when active)
-              if (_showSearch)
-                SliverToBoxAdapter(
-                  child: _buildSearchBar(),
-                ),
+              if (_showSearch) SliverToBoxAdapter(child: _buildSearchBar()),
 
-              // Category Tabs
               SliverToBoxAdapter(
-                child: categories.when(
-                  data: (cats) => _buildCategoryTabs(cats),
-                  loading: () => const SizedBox(height: 60),
-                  error: (_, _) => const SizedBox(),
+                child: Column(
+                  children: [
+                    categories.when(
+                      data: (cats) => _buildCategoryTabs(cats),
+                      loading: () => const SizedBox(height: 60),
+                      error: (_, _) => const SizedBox(),
+                    ),
+                  ],
                 ),
               ),
 
-              // Tips List
-              SliverToBoxAdapter(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 10),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-                  ),
-                  child: tips.when(
-                    data: (tipsList) {
-                      final filteredTips = _filterTips(tipsList);
 
-                      if (filteredTips.isEmpty) {
-                        return Container(
+              tips.when(
+                data: (tipsList) {
+                  final filteredTips = _filterTips(tipsList);
+
+                  if (filteredTips.isEmpty) {
+                    return SliverToBoxAdapter(
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(25),
+                          ),
+                        ),
+                        child: SizedBox(
                           height: MediaQuery.of(context).size.height * 0.5,
                           child: _buildEmptyState(),
-                        );
-                      }
-
-                      return RefreshIndicator(
-                        onRefresh: () => _refreshTips(),
-                        color: AppColors.primaryGreen,
-                        child: Column(
-                          children: [
-                            const SizedBox(height: 20),
-                            ...filteredTips.asMap().entries.map((entry) {
-                              final index = entry.key;
-                              final tip = entry.value;
-                              return FadeInUp(
-                                duration: const Duration(milliseconds: 400),
-                                delay: Duration(milliseconds: index * 50),
-                                child: Container(
-                                  margin: const EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                    vertical: 8,
-                                  ),
-                                  child: TipCard(
-                                    tip: tip,
-                                    onTap: () => _viewTipDetails(tip),
-                                    onSave: () => _toggleSaveTip(tip),
-                                    onLike: () => _toggleLikeTip(tip),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                            const SizedBox(height: 100), // Bottom padding
-                          ],
                         ),
-                      );
-                    },
-                    loading: () => Container(
+                      ),
+                    );
+                  }
+
+                  return SliverToBoxAdapter(
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(25),
+                        ),
+                      ),
+                      child: ListView.builder(
+                        physics: const NeverScrollableScrollPhysics(),
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        itemCount: filteredTips.length,
+                        itemBuilder: (context, index) {
+                          final tip = filteredTips[index];
+                          return Container(
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 8,
+                            ),
+                            child: TipCard(
+                              tip: tip,
+                              onTap: () => _viewTipDetails(tip),
+                              onSave: () => _toggleSaveTip(tip),
+                              onLike: () => _toggleLikeTip(tip),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                },
+                loading: () => SliverToBoxAdapter(
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(25),
+                      ),
+                    ),
+                    child: SizedBox(
                       height: MediaQuery.of(context).size.height * 0.5,
                       child: _buildLoadingState(),
                     ),
-                    error: (error, stack) => Container(
+                  ),
+                ),
+                error: (error, stack) => SliverToBoxAdapter(
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(25),
+                      ),
+                    ),
+                    child: SizedBox(
                       height: MediaQuery.of(context).size.height * 0.5,
                       child: _buildErrorState(error),
                     ),
@@ -160,7 +177,6 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
             ],
           ),
         ),
-        floatingActionButton: _buildFloatingActionButton(),
       ),
     );
   }
@@ -178,11 +194,7 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
                 color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(
-                Icons.lightbulb,
-                color: Colors.white,
-                size: 24,
-              ),
+              child: const Icon(Icons.lightbulb, color: Colors.white, size: 24),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -272,57 +284,56 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
   }
 
   Widget _buildCategoryTabs(List<String> categories) {
-    return FadeInUp(
-      duration: const Duration(milliseconds: 600),
-      delay: const Duration(milliseconds: 300),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: categories.map((category) {
-              final isSelected = _selectedCategory == category;
-              return Container(
-                margin: const EdgeInsets.only(right: 12),
-                child: GestureDetector(
-                  onTap: () => setState(() => _selectedCategory = category),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: categories.map((category) {
+            final isSelected = _selectedCategory == category;
+            return Container(
+              margin: const EdgeInsets.only(right: 12),
+              child: GestureDetector(
+                onTap: () => setState(() => _selectedCategory = category),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? Colors.white
+                        : Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(25),
+                    border: Border.all(
                       color: isSelected
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(25),
-                      border: Border.all(
-                        color: isSelected
-                            ? Colors.transparent
-                            : Colors.white.withValues(alpha: 0.3),
-                        width: 1,
-                      ),
-                      boxShadow: isSelected ? [
-                        BoxShadow(
-                          color: Colors.white.withValues(alpha: 0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ] : null,
+                          ? Colors.transparent
+                          : Colors.white.withValues(alpha: 0.3),
+                      width: 1,
                     ),
-                    child: Text(
-                      _formatCategoryName(category),
-                      style: TextStyle(
-                        color: isSelected
-                            ? AppColors.primaryGreen
-                            : Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: Colors.white.withValues(alpha: 0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Text(
+                    _formatCategoryName(category),
+                    style: TextStyle(
+                      color: isSelected ? AppColors.primaryGreen : Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
                     ),
                   ),
                 ),
-              );
-            }).toList(),
-          ),
+              ),
+            );
+          }).toList(),
         ),
       ),
     );
@@ -369,9 +380,9 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
                 _searchQuery.isNotEmpty
                     ? 'Try searching with different keywords'
                     : 'Check back later for new farming tips',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.grey.shade600,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: Colors.grey.shade600),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -386,13 +397,9 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
       padding: const EdgeInsets.all(20),
       itemCount: 6,
       itemBuilder: (context, index) {
-        return FadeInUp(
-          duration: const Duration(milliseconds: 400),
-          delay: Duration(milliseconds: index * 100),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            child: const TipCardShimmer(),
-          ),
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: const TipCardShimmer(),
         );
       },
     );
@@ -423,9 +430,9 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
               const SizedBox(height: 12),
               Text(
                 'Please check your connection and try again',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.grey.shade600,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: Colors.grey.shade600),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -444,21 +451,6 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
     );
   }
 
-  Widget _buildFloatingActionButton() {
-    return FadeInUp(
-      duration: const Duration(milliseconds: 800),
-      delay: const Duration(milliseconds: 600),
-      child: FloatingActionButton(
-        onPressed: () {
-          // Scroll to top functionality could be implemented with a ScrollController if needed
-        },
-        backgroundColor: AppColors.primaryGreen,
-        child: const Icon(Icons.keyboard_arrow_up, color: Colors.white),
-      ),
-    );
-  }
-
-  // Helper Methods
   List<Map<String, dynamic>> _filterTips(List<Map<String, dynamic>> tips) {
     if (_searchQuery.isEmpty) return tips;
 
@@ -475,9 +467,10 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
 
   String _formatCategoryName(String category) {
     if (category == 'all') return 'All';
-    return category.split(' ').map((word) =>
-    word[0].toUpperCase() + word.substring(1)
-    ).join(' ');
+    return category
+        .split(' ')
+        .map((word) => word[0].toUpperCase() + word.substring(1))
+        .join(' ');
   }
 
   Future<void> _refreshTips() async {
@@ -497,21 +490,29 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
     );
   }
 
-  void _toggleSaveTip(Map<String, dynamic> tip) {
+  void _toggleSaveTip(Map<String, dynamic> tip) async {
     final tipId = tip['id'] as String;
-    ref.read(tipsRepositoryProvider).saveTip(tipId, 'current_user_id');
+    final userId = (await ref.read(currentUserProfileProvider.future))?.id;
+    ref
+        .read(tipsRepositoryProvider)
+        .saveTip(tipId, userId ?? "current_user_id");
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Tip ${tip['isSaved'] ? 'removed from' : 'saved to'} bookmarks'),
+        content: Text(
+          'Tip ${tip['isSaved'] ? 'removed from' : 'saved to'} bookmarks',
+        ),
         backgroundColor: AppColors.primaryGreen,
       ),
     );
   }
 
-  void _toggleLikeTip(Map<String, dynamic> tip) {
+  void _toggleLikeTip(Map<String, dynamic> tip) async {
     final tipId = tip['id'] as String;
-    ref.read(tipsRepositoryProvider).likeTip(tipId, 'current_user_id');
+    final userId = (await ref.read(currentUserProfileProvider.future))?.id;
+    ref
+        .read(tipsRepositoryProvider)
+        .likeTip(tipId, userId ?? 'current_user_id');
   }
 
   void _showSavedTips() {

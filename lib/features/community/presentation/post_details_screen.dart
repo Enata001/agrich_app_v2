@@ -7,11 +7,13 @@ import 'package:timeago/timeago.dart' as timeago;
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/providers/app_providers.dart';
+import '../../../core/services/network_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/config/app_config.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../shared/widgets/loading_indicator.dart';
 import '../../shared/widgets/custom_button.dart';
+import '../../shared/widgets/network_error_widget.dart';
 import 'providers/community_provider.dart';
 
 
@@ -656,60 +658,19 @@ class _PostDetailsScreenState extends ConsumerState<PostDetailsScreen> {
   }
 
   Widget _buildErrorState(Object error) {
-    return Center(
-      child: FadeIn(
-        duration: const Duration(milliseconds: 800),
-        child: Container(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 80,
-                color: Colors.red.shade400,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Unable to load post',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Please check your connection and try again.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CustomButton(
-                    text: 'Retry',
-                    onPressed: () {
-                      ref.invalidate(postDetailsProvider(widget.postId));
-                      ref.invalidate(postCommentsProvider(widget.postId));
-                    },
-                    backgroundColor: AppColors.primaryGreen,
-                    textColor: Colors.white,
-                    icon: const Icon(Icons.refresh),
-                  ),
-                  const SizedBox(width: 16),
-                  CustomButton(
-                    text: 'Go Back',
-                    onPressed: () => context.pop(),
-                    backgroundColor: Colors.grey.shade200,
-                    textColor: AppColors.textPrimary,
-                    icon: const Icon(Icons.arrow_back),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+    // ✅ ADD NETWORK-AWARE ERROR HANDLING
+    if (error is NetworkException) {
+      return NetworkErrorWidget(
+        title: 'Post Unavailable Offline',
+        message: 'This post requires internet connection to view.',
+        onRetry: () => ref.invalidate(postDetailsProvider(widget.postId)),
+      );
+    }
+
+    return NetworkErrorWidget(
+      title: 'Unable to load post',
+      message: 'Please check your connection and try again.',
+      onRetry: () => ref.invalidate(postDetailsProvider(widget.postId)),
     );
   }
 

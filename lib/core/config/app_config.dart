@@ -67,4 +67,10 @@ class CacheKeys {
   static const String dailyTip = 'daily_tip';
   static const String weatherData = 'weather_data';
   static const String lastWeatherUpdate = 'last_weather_update';
+  static const String cachedPosts = 'cached_posts';
+  static const String cachedTips = 'cached_tips';
+  static const String cachedWeather = 'weather';
+  static const String userChats = 'user_chats';
+  static const String chatMessages = 'chat_messages';
+
 }

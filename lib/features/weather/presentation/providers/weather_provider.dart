@@ -1,20 +1,38 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
+import '../../../../core/services/network_service.dart' hide networkServiceProvider;
 
 // Current Weather Provider
-final currentWeatherProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+
+
+final currentWeatherProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
   final weatherRepository = ref.watch(weatherRepositoryProvider);
-  return await weatherRepository.getCurrentWeatherWithFallback();
+
+  try {
+    print('🌤️ Weather provider: Starting fetch...');
+    final weatherData = await weatherRepository.getCurrentWeatherWithFallback();
+    print('✅ Weather provider: Data received - ${weatherData['city']} ${weatherData['temperature']}°C');
+    return weatherData;
+  } catch (e) {
+    print('❌ Weather provider error: $e');
+    rethrow;
+  }
 });
 
-// Weather Forecast Provider (5 days, 3-hour intervals)
-final weatherForecastProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+// ✅ Weather forecast provider
+final weatherForecastProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, int>((ref, days) async {
   final weatherRepository = ref.watch(weatherRepositoryProvider);
+  final networkService = ref.watch(networkServiceProvider);
+
   try {
-    return await weatherRepository.getWeatherForecast(days: 5);
+    if (!await networkService.checkConnectivity()) {
+      throw NetworkException('Weather forecast requires internet connection');
+    }
+
+    return await weatherRepository.getWeatherForecast(days: days);
   } catch (e) {
-    // Return empty list on error - the UI will handle this gracefully
-    return <Map<String, dynamic>>[];
+    print('Error loading weather forecast: $e');
+    rethrow;
   }
 });
 

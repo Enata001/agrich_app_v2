@@ -382,6 +382,7 @@ class AuthRepository {
 
       final doc = await _firebaseService.getUser(uid);
       if (doc.exists) {
+        print(doc.data() as Map<String, dynamic>);
         final userModel = UserModel.fromMap(doc.data() as Map<String, dynamic>);
         await _cacheUserProfile(userModel);
         return userModel;
@@ -467,11 +468,11 @@ class AuthRepository {
   // Private helper methods
   Future<void> _cacheUserData(User user) async {
     final userData = {
-      'uid': user.uid,
+      'id': user.uid,
       'email': user.email,
-      'displayName': user.displayName,
+      'username': user.displayName,
       'phoneNumber': user.phoneNumber,
-      'photoURL': user.photoURL,
+      'profilePictureUrl': user.photoURL,
       'isEmailVerified': user.emailVerified,
       'lastSignIn': DateTime.now().toIso8601String(),
     };
@@ -485,6 +486,7 @@ class AuthRepository {
   UserModel? _getCachedUserProfile() {
     try {
       final profileJson = _localStorageService.getUserData();
+      print(profileJson);
       if (profileJson != null) {
         return UserModel.fromMap(profileJson);
       }

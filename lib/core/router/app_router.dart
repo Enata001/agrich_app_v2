@@ -23,7 +23,9 @@ import 'route_transitions.dart';
 
 class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
-
+  static push(String location, {dynamic extra}){
+    _rootNavigatorKey.currentContext?.push(location, extra: extra);
+  }
   static GoRouter get router => GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: AppRoutes.splash,

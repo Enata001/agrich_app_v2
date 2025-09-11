@@ -1,5 +1,7 @@
 
 
+import 'dart:math';
+
 import 'package:animate_do/animate_do.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -1001,6 +1003,7 @@ class _TipsUploaderScreenState extends State<TipsUploaderScreen> {
     );
   }
 
+
   Future<void> _uploadTips() async {
     setState(() {
       _isUploading = true;
@@ -1010,17 +1013,19 @@ class _TipsUploaderScreenState extends State<TipsUploaderScreen> {
     });
 
     final tips = RiceFarmingTipsData.getAllTips();
+    final random = Random();
 
     for (int i = 0; i < tips.length; i++) {
       try {
         final tip = tips[i];
 
-        // Add metadata
+        // Add metadata including randomIndex
         final tipData = {
           ...tip,
           'isActive': true,
           'likesCount': 0,
           'viewCount': 0,
+          'randomIndex': random.nextDouble(), // 👈 here’s the key part
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         };
@@ -1034,7 +1039,6 @@ class _TipsUploaderScreenState extends State<TipsUploaderScreen> {
           _uploadLog.add('✅ ${i + 1}/100: ${tip['title']}');
         });
 
-        // Small delay to show progress and not overwhelm Firestore
         await Future.delayed(const Duration(milliseconds: 50));
       } catch (e) {
         setState(() {
@@ -1043,8 +1047,6 @@ class _TipsUploaderScreenState extends State<TipsUploaderScreen> {
       }
     }
 
-    // Create daily tip entries
-    await _createDailyTipEntries();
 
     setState(() {
       _isUploading = false;
@@ -1052,55 +1054,11 @@ class _TipsUploaderScreenState extends State<TipsUploaderScreen> {
       _uploadLog.add('🎉 Successfully uploaded $_uploadedCount tips!');
     });
 
-    // Show success dialog
     if (mounted) {
       _showSuccessDialog();
     }
   }
 
-  Future<void> _createDailyTipEntries() async {
-    try {
-      setState(() {
-        _currentStatus = 'Creating daily tip entries...';
-      });
-
-      // Get all uploaded tips
-      final tipsSnapshot = await FirebaseFirestore.instance
-          .collection('tips')
-          .get();
-      final tipIds = tipsSnapshot.docs.map((doc) => doc.id).toList();
-
-      if (tipIds.isEmpty) return;
-
-      // Create daily tips for next 30 days
-      final today = DateTime.now();
-      for (int i = 0; i < 30; i++) {
-        final date = today.add(Duration(days: i));
-        final dateKey =
-            '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-
-        // Select a tip for each day (cycle through available tips)
-        final tipId = tipIds[i % tipIds.length];
-
-        await FirebaseFirestore.instance
-            .collection('daily_tips')
-            .doc(dateKey)
-            .set({
-          'tipId': tipId,
-          'featured': true,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      }
-
-      setState(() {
-        _uploadLog.add('✅ Created 30 daily tip entries');
-      });
-    } catch (e) {
-      setState(() {
-        _uploadLog.add('❌ Error creating daily tips: $e');
-      });
-    }
-  }
 
   void _showSuccessDialog() {
     showDialog(
