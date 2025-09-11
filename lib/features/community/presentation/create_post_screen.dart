@@ -1,5 +1,7 @@
 // lib/features/community/presentation/create_post_screen.dart
 
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -51,7 +53,6 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(currentUserProvider);
-
     return Scaffold(
       backgroundColor: AppColors.background,
       resizeToAvoidBottomInset: true,
@@ -117,7 +118,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     );
   }
 
-  Widget _buildUserInfo(dynamic currentUser) {
+  Widget _buildUserInfo(User? currentUser) {
     return FadeInDown(
       duration: const Duration(milliseconds: 600),
       child: Row(
@@ -125,7 +126,10 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
           CircleAvatar(
             radius: 20,
             backgroundColor: AppColors.primaryGreen,
-            child: Text(
+            backgroundImage: currentUser?.photoURL != null
+      ? CachedNetworkImageProvider(currentUser!.photoURL!)
+          : null,
+            child: currentUser?.photoURL ==null || currentUser!.photoURL!.isEmpty?Text(
               currentUser?.displayName?.isNotEmpty == true
                   ? currentUser!.displayName![0].toUpperCase()
                   : 'U',
@@ -133,7 +137,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
               ),
-            ),
+            ): null,
           ),
           const SizedBox(width: 12),
           Column(
@@ -189,14 +193,6 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                 style: TextStyle(
                   color: Colors.grey.shade600,
                   fontSize: 12,
-                ),
-              ),
-              Text(
-                '$_characterCount/500',
-                style: TextStyle(
-                  color: _characterCount > 450 ? AppColors.error : Colors.grey.shade600,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],

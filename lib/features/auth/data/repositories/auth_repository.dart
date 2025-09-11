@@ -467,16 +467,20 @@ class AuthRepository {
 
   // Private helper methods
   Future<void> _cacheUserData(User user) async {
-    final userData = {
+    final data = {
       'id': user.uid,
       'email': user.email,
       'username': user.displayName,
       'phoneNumber': user.phoneNumber,
       'profilePictureUrl': user.photoURL,
       'isEmailVerified': user.emailVerified,
+      'isPhoneVerified': true,
       'lastSignIn': DateTime.now().toIso8601String(),
     };
-    await _localStorageService.setUserData(userData);
+
+    UserModel userData = UserModel.fromMap(data);
+
+    await _localStorageService.setUserData(userData.toMap());
   }
 
   Future<void> _cacheUserProfile(UserModel userModel) async {

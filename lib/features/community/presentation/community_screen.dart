@@ -222,7 +222,6 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
         child: ListView.builder(
           controller: _scrollController,
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
-          // Extra bottom padding for FAB
           itemCount: posts.length,
           itemBuilder: (context, index) {
             final post = posts[index];

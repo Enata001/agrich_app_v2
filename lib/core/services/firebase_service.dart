@@ -1,13 +1,16 @@
 import 'dart:io';
+import 'package:agrich_app_v2/core/providers/app_providers.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/app_config.dart';
 
 class FirebaseService {
   final FirebaseFirestore _firestore;
   final FirebaseStorage _storage;
+  final Ref ref;
 
-  FirebaseService(this._firestore, this._storage);
+  FirebaseService(this._firestore, this._storage, this.ref);
 
 
   Future<void> createUser(String uid, Map<String, dynamic> userData) async {
@@ -42,6 +45,12 @@ class FirebaseService {
   }
 
   Future<void> updateUser(String uid, Map<String, dynamic> userData) async {
+    if(userData.containsKey('profilePictureUrl')){
+      print('yes');
+      await ref.read(firebaseAuthProvider).currentUser?.updatePhotoURL(userData['profilePictureUrl']);
+    }if(userData.containsKey('username')){
+      await ref.read(firebaseAuthProvider).currentUser?.updateDisplayName(userData['username']);
+    }
     await _firestore.collection(AppConfig.usersCollection).doc(uid).update({
       ...userData,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -140,23 +149,6 @@ class FirebaseService {
       ...messageData,
       'createdAt': FieldValue.serverTimestamp(),
     });
-  }
-
-  Future<int> _getUnreadMessageCount(String chatId, String userId) async {
-    try {
-      final unreadQuery = await _firestore
-          .collection('chats')
-          .doc(chatId)
-          .collection('messages')
-          .where('senderId', isNotEqualTo: userId)
-          .where('isRead', isEqualTo: false)
-          .count()
-          .get();
-
-      return unreadQuery.count ?? 0;
-    } catch (e) {
-      return 0;
-    }
   }
 
   Future<void> sendTypingIndicator(String chatId, String userId, bool isTyping) async {
@@ -1081,15 +1073,85 @@ class FirebaseService {
     });
   }
 
-  Stream<QuerySnapshot> getUserChatsStream(String userId) {
+  Stream<List<Map<String, dynamic>>> getUserChatsStream(String userId) {
     return _firestore
         .collection(AppConfig.chatsCollection)
         .where('participants', arrayContains: userId)
         .where('isActive', isEqualTo: true)
         .orderBy('lastMessageTime', descending: true)
-        .snapshots();
+        .snapshots()
+        .asyncMap((snapshot) async {
+      List<Map<String, dynamic>> chats = [];
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final participants = List<String>.from(data['participants'] ?? []);
+
+        // Find the other user (recipient)
+        final otherUserId = participants.firstWhere(
+              (id) => id != userId,
+          orElse: () => '',
+        );
+
+        if (otherUserId.isNotEmpty) {
+          // Fetch the other user's data
+          final otherUserDoc = await _firestore
+              .collection(AppConfig.usersCollection)
+              .doc(otherUserId)
+              .get();
+
+          final otherUserData = otherUserDoc.data() ?? {};
+
+          // Get unread message count
+          final unreadCount = await _getUnreadMessageCount(doc.id, userId);
+
+          // Create enhanced chat object with recipient data
+          chats.add({
+            'id': doc.id,
+            'participants': participants,
+            'recipientId': otherUserId,
+            'recipientName': otherUserData['displayName'] ??
+                otherUserData['username'] ??
+                'Unknown User',
+            'recipientAvatar': otherUserData['photoURL'] ??
+                otherUserData['profilePictureUrl'] ??
+                '',
+            'lastMessage': data['lastMessage'] ?? '',
+            'lastMessageType': data['lastMessageType'] ?? 'text',
+            'lastMessageTime': data['lastMessageTime'],
+            'lastMessageSenderId': data['lastMessageSenderId'] ?? '',
+            'unreadCount': unreadCount,
+            'isOnline': otherUserData['isOnline'] ?? false,
+            'lastSeen': otherUserData['lastSeen'],
+            'isActive': data['isActive'] ?? true,
+            'createdAt': data['createdAt'],
+            'updatedAt': data['updatedAt'],
+          });
+        }
+      }
+
+      return chats;
+    });
   }
 
+// 🔧 FIX 2: Add the missing _getUnreadMessageCount method
+  Future<int> _getUnreadMessageCount(String chatId, String userId) async {
+    try {
+      final unreadQuery = await _firestore
+          .collection(AppConfig.chatsCollection)
+          .doc(chatId)
+          .collection(AppConfig.messagesCollection)
+          .where('senderId', isNotEqualTo: userId)
+          .where('isRead', isEqualTo: false)
+          .count()
+          .get();
+
+      return unreadQuery.count ?? 0;
+    } catch (e) {
+      print('Error getting unread count: $e');
+      return 0;
+    }
+  }
   Stream<QuerySnapshot> getChatMessagesStream(String chatId) {
     return _firestore
         .collection(AppConfig.chatsCollection)

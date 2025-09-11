@@ -38,6 +38,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   bool _isTyping = false;
   bool _showEmojiPicker = false;
+  late UserModel currentUser;
 
   @override
   void initState() {
@@ -46,6 +47,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     // Mark messages as read when entering chat
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      currentUser = UserModel.fromMap(
+        ref.read(localStorageServiceProvider).getUserData() ?? {},
+      );
       _markMessagesAsRead();
     });
   }
@@ -65,24 +69,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         _isTyping = isTyping;
       });
 
-      // Send typing indicator
-      final currentUser = UserModel.fromMap(ref.read(localStorageServiceProvider).getUserData() ?? {});
-      ref.read(chatRepositoryProvider).sendTypingIndicator(
-        widget.chatId,
-        currentUser.id,
-        isTyping,
-      );
-        }
+      ref
+          .read(chatRepositoryProvider)
+          .sendTypingIndicator(widget.chatId, currentUser.id, isTyping);
+    }
   }
 
   void _markMessagesAsRead() {
-    final currentUser = UserModel.fromMap(ref.read(localStorageServiceProvider).getUserData() ?? {});
-    ref.read(chatRepositoryProvider).markMessagesAsRead(widget.chatId, currentUser.id);
-    }
+    ref
+        .read(chatRepositoryProvider)
+        .markMessagesAsRead(widget.chatId, currentUser.id);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = ref.watch(currentUserProvider);
+    final currentUser = UserModel.fromMap(
+      ref.read(localStorageServiceProvider).getUserData() ?? {},
+    );
     final messages = ref.watch(chatMessagesProvider(widget.chatId));
 
     return Scaffold(
@@ -94,7 +97,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           // Messages List
           Expanded(
             child: messages.when(
-              data: (messagesList) => _buildMessagesList(context, messagesList, currentUser?.uid ?? ''),
+              data: (messagesList) => _buildMessagesList(
+                context,
+                messagesList,
+                currentUser.id ?? '',
+              ),
               loading: () => const Center(
                 child: LoadingIndicator(
                   size: LoadingSize.medium,
@@ -113,6 +120,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
+    // 🔧 FIX: Helper function to validate avatar URL
+    bool isValidAvatarUrl(String? url) {
+      if (url == null || url.isEmpty) return false;
+      if (url == 'null') return false;
+      if (!url.startsWith('http')) return false;
+      return Uri.tryParse(url) != null;
+    }
+
     return AppBar(
       backgroundColor: AppColors.primaryGreen,
       foregroundColor: Colors.white,
@@ -126,19 +141,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           CircleAvatar(
             radius: 18,
             backgroundColor: Colors.white.withValues(alpha: 0.2),
-            backgroundImage: widget.recipientAvatar != null
+            // 🔧 FIX: Only use image for valid URLs
+            backgroundImage: isValidAvatarUrl(widget.recipientAvatar)
                 ? CachedNetworkImageProvider(widget.recipientAvatar!)
                 : null,
-            child: widget.recipientAvatar == null
+            child: !isValidAvatarUrl(widget.recipientAvatar)
                 ? Text(
-              widget.recipientName.isNotEmpty
-                  ? widget.recipientName[0].toUpperCase()
-                  : 'U',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            )
+                    widget.recipientName.isNotEmpty
+                        ? widget.recipientName[0].toUpperCase()
+                        : 'U',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  )
                 : null,
           ),
           const SizedBox(width: 12),
@@ -156,7 +172,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  'Online', // TODO: Implement real online status
+                  'Online',
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.7),
                     fontSize: 12,
@@ -176,7 +192,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _buildMessagesList(BuildContext context, List<dynamic> messagesList, String currentUserId) {
+  Widget _buildMessagesList(
+    BuildContext context,
+    List<dynamic> messagesList,
+    String currentUserId,
+  ) {
     if (messagesList.isEmpty) {
       return _buildEmptyState();
     }
@@ -204,28 +224,40 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ? DateTime.tryParse(message['timestamp']) ?? DateTime.now()
         : DateTime.now();
 
+    bool isValidAvatarUrl(String? url) {
+      if (url == null || url.isEmpty) return false;
+      if (url == 'null') return false;
+      if (!url.startsWith('http')) return false;
+      return Uri.tryParse(url) != null;
+    }
+
     return FadeInUp(
       duration: const Duration(milliseconds: 300),
       child: Row(
-        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isMe
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!isMe) ...[
             CircleAvatar(
               radius: 12,
               backgroundColor: AppColors.primaryGreen,
-              backgroundImage: widget.recipientAvatar != null
+              // 🔧 FIX: Use validation function here too
+              backgroundImage: isValidAvatarUrl(widget.recipientAvatar)
                   ? CachedNetworkImageProvider(widget.recipientAvatar!)
                   : null,
-              child: widget.recipientAvatar == null
+              child: !isValidAvatarUrl(widget.recipientAvatar)
                   ? Text(
-                widget.recipientName[0].toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              )
+                      widget.recipientName.isNotEmpty
+                          ? widget.recipientName[0].toUpperCase()
+                          : 'U',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10,
+                      ),
+                    )
                   : null,
             ),
             const SizedBox(width: 8),
@@ -275,7 +307,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       if (isMe) ...[
                         const SizedBox(width: 4),
                         Icon(
-                          message['isRead'] == true ? Icons.done_all : Icons.done,
+                          message['isRead'] == true
+                              ? Icons.done_all
+                              : Icons.done,
                           size: 12,
                           color: message['isRead'] == true
                               ? Colors.blue.shade300
@@ -355,10 +389,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           children: [
             IconButton(
               onPressed: () => _pickImage(),
-              icon: Icon(
-                Icons.camera_alt,
-                color: AppColors.primaryGreen,
-              ),
+              icon: Icon(Icons.camera_alt, color: AppColors.primaryGreen),
             ),
             Expanded(
               child: Container(
@@ -401,7 +432,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: _isTyping ? AppColors.primaryGreen : Colors.grey.shade300,
+                  color: _isTyping
+                      ? AppColors.primaryGreen
+                      : Colors.grey.shade300,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -430,9 +463,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           const SizedBox(height: 16),
           Text(
             'No messages yet',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.grey.shade600,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(color: Colors.grey.shade600),
           ),
           const SizedBox(height: 8),
           Text(
@@ -449,17 +482,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.error_outline,
-            size: 80,
-            color: Colors.red.shade400,
-          ),
+          Icon(Icons.error_outline, size: 80, color: Colors.red.shade400),
           const SizedBox(height: 16),
           Text(
             'Failed to load messages',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.red.shade600,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(color: Colors.red.shade600),
           ),
           const SizedBox(height: 8),
           Text(
@@ -479,52 +508,49 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Future<void> _sendMessage(dynamic currentUser) async {
-
-
+  Future<void> _sendMessage(UserModel currentUser) async {
     final networkStatus = ref.read(networkStatusProvider);
-    networkStatus.when(data: (online)async{
+    networkStatus.when(
+      data: (online) async {
+        final content = _messageController.text.trim();
+        if (content.isEmpty || currentUser == null) return;
 
-      final content = _messageController.text.trim();
-      if (content.isEmpty || currentUser == null) return;
+        final messageData = {
+          'chatId': widget.chatId,
+          'senderId': currentUser.id,
+          'senderName': currentUser.username?? 'User',
+          'content': content,
+          'type': 'text',
+          'timestamp': DateTime.now().toIso8601String(),
+          'isRead': false,
+        };
 
-      final messageData = {
-        'chatId': widget.chatId,
-        'senderId': currentUser.id,
-        'senderName': currentUser.displayName ?? 'User',
-        'content': content,
-        'type': 'text',
-        'timestamp': DateTime.now().toIso8601String(),
-        'isRead': false,
-      };
-
-      _messageController.clear();
-      setState(() {
-        _isTyping = false;
-      });
-      try {
-        await ref.read(chatRepositoryProvider).sendMessage(messageData);
-        _scrollToBottom();
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send message: $e'),
-            backgroundColor: Colors.red,
+        _messageController.clear();
+        setState(() {
+          _isTyping = false;
+        });
+        try {
+          await ref.read(chatRepositoryProvider).sendMessage(messageData);
+          _scrollToBottom();
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to send message: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
+      error: (error, stackTrace) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to send message: Check your Internet connection',
           ),
-        );
-      }
-    }, error:(error, stackTrace) =>   ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Failed to send message: Check your Internet connection'),
-        backgroundColor: Colors.red,
+          backgroundColor: Colors.red,
+        ),
       ),
-    ), loading: () {
-
-    },);
-
-
-
-
+      loading: () {},
+    );
   }
 
   Future<void> _pickImage() async {
@@ -577,7 +603,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _sendImageMessage(File imageFile) async {
-    final currentUser = UserModel.fromMap(ref.read(localStorageServiceProvider).getUserData() ?? {});
+    final currentUser = UserModel.fromMap(
+      ref.read(localStorageServiceProvider).getUserData() ?? {},
+    );
 
     try {
       // Show loading indicator
@@ -589,7 +617,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       );
 
       // Upload image
-      final imageUrl = await ref.read(chatRepositoryProvider).uploadImage(imageFile);
+      final imageUrl = await ref
+          .read(chatRepositoryProvider)
+          .uploadImage(imageFile);
 
       final messageData = {
         'chatId': widget.chatId,
@@ -671,7 +701,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Block User'),
-        content: Text('Are you sure you want to block ${widget.recipientName}? You will no longer receive messages from them.'),
+        content: Text(
+          'Are you sure you want to block ${widget.recipientName}? You will no longer receive messages from them.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -680,22 +712,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              final currentUser = UserModel.fromMap(ref.read(localStorageServiceProvider).getUserData() ?? {});
+              final currentUser = UserModel.fromMap(
+                ref.read(localStorageServiceProvider).getUserData() ?? {},
+              );
               try {
                 // Extract recipient ID from chat participants
-                final chatInfo = await ref.read(chatRepositoryProvider).getChatInfo(widget.chatId);
-                final participants = List<String>.from(chatInfo?['participants'] ?? []);
+                final chatInfo = await ref
+                    .read(chatRepositoryProvider)
+                    .getChatInfo(widget.chatId);
+                final participants = List<String>.from(
+                  chatInfo?['participants'] ?? [],
+                );
                 final recipientId = participants.firstWhere(
-                      (id) => id != currentUser.id,
+                  (id) => id != currentUser.id,
                   orElse: () => '',
                 );
 
                 if (recipientId.isNotEmpty) {
-                  await ref.read(chatRepositoryProvider).blockUser(currentUser.id, recipientId);
+                  await ref
+                      .read(chatRepositoryProvider)
+                      .blockUser(currentUser.id, recipientId);
 
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('User blocked successfully')),
+                      const SnackBar(
+                        content: Text('User blocked successfully'),
+                      ),
                     );
                     context.pop(); // Go back to chat list
                   }
@@ -707,7 +749,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   );
                 }
               }
-                        },
+            },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Block'),
           ),
@@ -721,7 +763,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Chat'),
-        content: const Text('Are you sure you want to delete this chat? This action cannot be undone.'),
+        content: const Text(
+          'Are you sure you want to delete this chat? This action cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -730,10 +774,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
+              Navigator.pop(context);
               try {
-                await ref.read(chatRepositoryProvider).deleteChat(widget.chatId);
+                await ref
+                    .read(chatRepositoryProvider)
+                    .deleteChat(widget.chatId);
                 if (mounted) {
-                  context.pop(); // Go back to chat list
+                  context.pop();
                 }
               } catch (e) {
                 if (mounted) {

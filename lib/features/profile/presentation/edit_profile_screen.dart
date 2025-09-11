@@ -465,7 +465,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
     setState(() => _isLoading = true);
 
-    print(currentUser.id);
     try {
 
 

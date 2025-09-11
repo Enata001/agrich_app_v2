@@ -203,15 +203,25 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
       ),
     );
   }
+// 🔍 DEBUG: Add this debug version to your _buildChatItem method
+// lib/features/chat/presentation/chat_list_screen.dart
 
   Widget _buildChatItem(BuildContext context, Map<String, dynamic> chat) {
-    print( chat);
+    print('=== CHAT DATA DEBUG ===');
+    print('Full chat object: $chat');
+
     final recipientName = chat['recipientName'] as String? ?? 'Unknown User';
     final recipientAvatar = chat['recipientAvatar'] as String? ?? '';
     final lastMessage = chat['lastMessage'] as String? ?? '';
     final lastMessageTime = chat['lastMessageTime'] as DateTime?;
     final unreadCount = chat['unreadCount'] as int? ?? 0;
     final isOnline = chat['isOnline'] as bool? ?? false;
+
+    print('Extracted recipientName: "$recipientName"');
+    print('Extracted recipientAvatar: "$recipientAvatar"');
+    print('RecipientAvatar isEmpty: ${recipientAvatar.isEmpty}');
+    print('RecipientAvatar length: ${recipientAvatar.length}');
+    print('======================');
 
     return GestureDetector(
       onTap: () => _openChat(context, chat),
@@ -237,20 +247,23 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
                   backgroundColor: AppColors.primaryGreen.withValues(
                     alpha: 0.2,
                   ),
-                  backgroundImage: recipientAvatar.isNotEmpty
+                  // 🔍 DEBUG: Add validation before using CachedNetworkImageProvider
+                  backgroundImage: (recipientAvatar.isNotEmpty &&
+                      recipientAvatar.startsWith('http'))
                       ? CachedNetworkImageProvider(recipientAvatar)
                       : null,
-                  child: recipientAvatar.isEmpty
+                  child: (recipientAvatar.isEmpty ||
+                      !recipientAvatar.startsWith('http'))
                       ? Text(
-                          recipientName.isNotEmpty
-                              ? recipientName[0].toUpperCase()
-                              : 'U',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primaryGreen,
-                          ),
-                        )
+                    recipientName.isNotEmpty
+                        ? recipientName[0].toUpperCase()
+                        : 'U',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primaryGreen,
+                    ),
+                  )
                       : null,
                 ),
                 if (isOnline)
@@ -281,9 +294,9 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
                           recipientName,
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                              ),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -305,19 +318,18 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
                               : 'Start a conversation',
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
-                                color: lastMessage.isNotEmpty
-                                    ? AppColors.textSecondary
-                                    : AppColors.textTertiary,
-                                fontStyle: lastMessage.isEmpty
-                                    ? FontStyle.italic
-                                    : FontStyle.normal,
-                              ),
+                            color: lastMessage.isNotEmpty
+                                ? AppColors.textSecondary
+                                : AppColors.textTertiary,
+                            fontStyle: lastMessage.isEmpty
+                                ? FontStyle.italic
+                                : null,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (unreadCount > 0)
                         Container(
-                          margin: const EdgeInsets.only(left: 8),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
                             vertical: 4,
@@ -330,7 +342,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
                             unreadCount > 99 ? '99+' : unreadCount.toString(),
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -343,6 +355,23 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
           ],
         ),
       ),
+    );
+  }
+
+// 🔍 ALSO UNCOMMENT AND ADD DEBUG TO _openChat:
+  void _openChat(BuildContext context, Map<String, dynamic> chat) {
+    print('🚀 OPENING CHAT WITH DATA:');
+    print('chatId: ${chat['id']}');
+    print('recipientName: ${chat['recipientName']}');
+    print('recipientAvatar: ${chat['recipientAvatar']}');
+
+    context.push(
+      AppRoutes.chat,
+      extra: {
+        'chatId': chat['id'] ?? '',
+        'recipientName': chat['recipientName'] ?? '',
+        'recipientAvatar': chat['recipientAvatar'] ?? '',
+      },
     );
   }
 
@@ -562,16 +591,16 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
     );
   }
 
-  void _openChat(BuildContext context, Map<String, dynamic> chat) {
-    // context.push(
-    //   AppRoutes.chat,
-    //   extra: {
-    //     'chatId': chatId,
-    //     'recipientName': user['username'] ?? 'Unknown User',
-    //     'recipientAvatar': user['profilePictureUrl'] ?? '',
-    //   },
-    // );
-  }
+  // void _openChat(BuildContext context, Map<String, dynamic> chat) {
+  //   context.push(
+  //     AppRoutes.chat,
+  //     extra: {
+  //       'chatId': chat['id'] ?? '',
+  //       'recipientName': chat['recipientName'] ?? 'Unknown User',
+  //       'recipientAvatar': chat['recipientAvatar'] ?? '',
+  //     },
+  //   );
+  // }
 
   void _openChatbot(BuildContext context) {
     context.push('/chatbot');
@@ -641,7 +670,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
   Widget _buildUserSearchList(BuildContext context) {
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: ref.read(chatRepositoryProvider).searchUsers(''),
-      // Empty query to get all users
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -668,40 +696,73 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen>
           itemCount: otherUsers.length,
           itemBuilder: (context, index) {
             final user = otherUsers[index];
+            print("This is the other user data: $user");
+
+            // 🔧 FIX: Helper function to safely get profile picture URL
+            String getSafeProfilePictureUrl(dynamic profilePictureUrl) {
+              if (profilePictureUrl == null) return '';
+              final urlString = profilePictureUrl.toString();
+              if (urlString == 'null' || urlString.isEmpty) return '';
+              if (!urlString.startsWith('http')) return '';
+              return urlString;
+            }
+
+            final safeProfileUrl = getSafeProfilePictureUrl(user['profilePictureUrl']);
+
             return ListTile(
-              leading: CircleAvatar(
-                backgroundImage: user['profilePictureUrl']?.isNotEmpty == true
-                    ? CachedNetworkImageProvider(user['profilePictureUrl'])
-                    : null,
-                child: user['profilePictureUrl']?.isEmpty != false
-                    ? Text(user['username']?[0]?.toUpperCase() ?? 'U')
-                    : null,
-              ),
-              title: Text(user['username'] ?? 'Unknown User'),
-              subtitle: Text(user['bio'] ?? 'Farmer'),
+                leading: CircleAvatar(
+                  // 🔧 FIX: Only use CachedNetworkImageProvider for valid URLs
+                  backgroundImage: safeProfileUrl.isNotEmpty
+                      ? CachedNetworkImageProvider(safeProfileUrl)
+                      : null,
+                  child: safeProfileUrl.isEmpty
+                      ? Text(user['username']?[0]?.toUpperCase() ?? 'U')
+                      : null,
+                ),
+                title: Text(user['username'] ?? 'Unknown User'),
+                subtitle: Text(user['bio'] ?? 'Farmer'),
                 onTap: () async {
-                  final messenger = ScaffoldMessenger.of(context); // ✅ capture before pop
+                  final messenger = ScaffoldMessenger.of(context);
                   Navigator.pop(context);
 
                   try {
+                    // 🔧 FIX: Pass recipient data with safely handled profile picture
+                    final recipientData = {
+                      'id': user['id'],
+                      'username': user['username'],
+                      'displayName': user['username'],
+                      'profilePictureUrl': safeProfileUrl, // Use the safe URL
+                      'isOnline': user['isOnline'] ?? false,
+                    };
+
+                    print('🔍 NEW CHAT DEBUG:');
+                    print('User data: $user');
+                    print('Safe profile URL: "$safeProfileUrl"');
+                    print('Recipient data: $recipientData');
+
                     final chatId = await ref
                         .read(chatRepositoryProvider)
-                        .createOrGetChat([currentUser.id, user['id']]);
+                        .createOrGetChat([currentUser.id, user['id']], recipientData: recipientData);
 
                     if (mounted) {
+                      print('🚀 NAVIGATING TO CHAT:');
+                      print('- chatId: $chatId');
+                      print('- recipientName: ${user['username'] ?? 'Unknown User'}');
+                      print('- recipientAvatar: "$safeProfileUrl"');
+
                       AppRouter.push(
                         AppRoutes.chat,
                         extra: {
                           'chatId': chatId,
                           'recipientName': user['username'] ?? 'Unknown User',
-                          'recipientAvatar': user['profilePictureUrl'] ?? '',
+                          'recipientAvatar': safeProfileUrl, // ✅ Now safe - empty string won't cause errors
                         },
                       );
                     }
                   } catch (e) {
-                    print(e);
+                    print('❌ Error creating chat: $e');
                     if (mounted) {
-                      messenger.showSnackBar( // ✅ use captured messenger
+                      messenger.showSnackBar(
                         SnackBar(content: Text('Failed to start chat: $e')),
                       );
                     }

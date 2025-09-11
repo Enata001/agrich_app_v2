@@ -60,7 +60,7 @@ final networkServiceProvider = Provider<NetworkService>((ref) {
 final firebaseServiceProvider = Provider<FirebaseService>((ref) {
   final firestore = ref.watch(firestoreProvider);
   final storage = ref.watch(firebaseStorageProvider);
-  return FirebaseService(firestore, storage);
+  return FirebaseService(firestore, storage, ref);
 });
 
 final weatherServiceProvider = Provider<WeatherService>((ref) {

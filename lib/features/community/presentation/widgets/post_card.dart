@@ -63,6 +63,7 @@ class _PostCardState extends State<PostCard>
 
   @override
   Widget build(BuildContext context) {
+    print(widget.post);
     return GestureDetector(
       onTap: widget.onTap,
       child: Container(

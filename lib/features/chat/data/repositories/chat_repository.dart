@@ -90,7 +90,7 @@ class ChatRepository {
       'id': id,
       'username': data['username'] ?? '',
       'displayName': data['displayName'] ?? data['username'] ?? 'User',
-      'photoURL': data['profilePictureUrl'] ?? data['photoURL'] ?? '',
+      'profilePictureUrl': data['profilePictureUrl'] ?? data['photoURL'] ?? '',
       'bio': data['bio'] ?? '',
       'isOnline': data['isOnline'] ?? false,
       'lastSeen': (data['lastSeen'] as Timestamp?)?.toDate(),
@@ -107,13 +107,24 @@ class ChatRepository {
     }
 
     try {
-      final stream = _firebaseService.getUserChatsStream(userId).map((snapshot) {
-        final chats = snapshot.docs.map((doc) {
-          final data = doc.data() as Map<String, dynamic>;
+      // Now getUserChatsStream returns enhanced data with recipient info
+      final stream = _firebaseService.getUserChatsStream(userId).map((enhancedChats) {
+        // The data is already enhanced, just process timestamps
+        final chats = enhancedChats.map((chatData) {
           return {
-            'id': doc.id,
-            ...data,
-            'lastMessageTime': (data['lastMessageTime'] as Timestamp?)?.toDate(),
+            ...chatData,
+            'lastMessageTime': chatData['lastMessageTime'] != null
+                ? (chatData['lastMessageTime'] as Timestamp?)?.toDate()
+                : null,
+            'lastSeen': chatData['lastSeen'] != null
+                ? (chatData['lastSeen'] as Timestamp?)?.toDate()
+                : null,
+            'createdAt': chatData['createdAt'] != null
+                ? (chatData['createdAt'] as Timestamp?)?.toDate()
+                : null,
+            'updatedAt': chatData['updatedAt'] != null
+                ? (chatData['updatedAt'] as Timestamp?)?.toDate()
+                : null,
           };
         }).toList();
 
@@ -123,6 +134,7 @@ class ChatRepository {
 
       yield* stream;
     } catch (e) {
+      print('Error in getUserChats: $e');
       yield cachedChats;
     }
   }
@@ -199,7 +211,9 @@ class ChatRepository {
   }
 
 
-  Future<String> createOrGetChat(List<String> participantIds) async {
+  Future<String> createOrGetChat(List<String> participantIds, {
+    Map<String, dynamic>? recipientData, // Add optional recipient data
+  }) async {
     try {
       participantIds.sort();
       final existingChat = await _firebaseService.findChatByParticipants(participantIds);
@@ -207,7 +221,7 @@ class ChatRepository {
         return existingChat.docs.first.id;
       }
 
-
+      // Enhanced chat data with optional recipient info for better initial display
       final chatData = {
         'participants': participantIds,
         'lastMessage': '',
@@ -215,6 +229,10 @@ class ChatRepository {
         'lastMessageTime': FieldValue.serverTimestamp(),
         'lastMessageSenderId': '',
         'isActive': true,
+        // Store recipient data if provided (for faster initial load)
+        if (recipientData != null) ...{
+          'recipientData': recipientData,
+        },
       };
 
       final chatRef = await _firebaseService.createChat(chatData);
@@ -223,7 +241,6 @@ class ChatRepository {
       throw Exception('Failed to create chat: $e');
     }
   }
-
 
 
   Future<void> markMessagesAsRead(String chatId, String userId) async {

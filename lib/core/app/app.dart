@@ -19,11 +19,15 @@ class AgrichApp extends ConsumerWidget {
       routerConfig: router,
       // home: BulkImportScreen(),
       builder: (context, child) {
-        return MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(textScaler: TextScaler.linear(1.0)),
-          child: child!,
+        return SafeArea(
+          // bottom: true,
+          top: false,
+          child: MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(1.0)),
+            child: child!,
+          ),
         );
       },
     );
