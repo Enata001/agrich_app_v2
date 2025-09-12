@@ -186,18 +186,14 @@ class _PhoneSignInScreenState extends ConsumerState<PhoneSignInScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: AppColors.info,
-                    size: 20,
-                  ),
+                  Icon(Icons.info_outline, color: AppColors.info, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'We\'ll send you a verification code via SMS',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.info,
-                      ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: AppColors.info),
                     ),
                   ),
                 ],
@@ -215,10 +211,11 @@ class _PhoneSignInScreenState extends ConsumerState<PhoneSignInScreen> {
       delay: const Duration(milliseconds: 400),
       child: CustomButton(
         text: _isLoading ? 'Sending Code...' : 'Continue',
-        onPressed: _fullPhoneNumber.length > 7 && !_isLoading ? _handleContinue : null,
+        onPressed: _fullPhoneNumber.length > 7 && !_isLoading
+            ? _handleContinue
+            : null,
         isLoading: _isLoading,
         width: double.infinity,
-
       ),
     );
   }
@@ -230,10 +227,7 @@ class _PhoneSignInScreenState extends ConsumerState<PhoneSignInScreen> {
       child: Row(
         children: [
           Expanded(
-            child: Container(
-              height: 1,
-              color: Theme.of(context).dividerColor,
-            ),
+            child: Container(height: 1, color: Theme.of(context).dividerColor),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -246,10 +240,7 @@ class _PhoneSignInScreenState extends ConsumerState<PhoneSignInScreen> {
             ),
           ),
           Expanded(
-            child: Container(
-              height: 1,
-              color: Theme.of(context).dividerColor,
-            ),
+            child: Container(height: 1, color: Theme.of(context).dividerColor),
           ),
         ],
       ),
@@ -262,7 +253,8 @@ class _PhoneSignInScreenState extends ConsumerState<PhoneSignInScreen> {
       delay: const Duration(milliseconds: 600),
       child: CustomButton(
         text: 'Sign In with Email',
-        onPressed: () => context.pop(), // Go back to main auth screen
+        onPressed: () => context.pop(),
+        // Go back to main auth screen
         variant: ButtonVariant.outlined,
         width: double.infinity,
         // textColor: Colors.white,
@@ -274,7 +266,9 @@ class _PhoneSignInScreenState extends ConsumerState<PhoneSignInScreen> {
   Future<void> _handleContinue() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+    });
 
     try {
       // _fullPhoneNumber = _phoneController.text;
@@ -318,14 +312,14 @@ class _PhoneSignInScreenState extends ConsumerState<PhoneSignInScreen> {
         },
         codeSent: (String verificationId, int? resendToken) {
           if (mounted) {
-            // Navigate to OTP verification screen
             context.push(
               AppRoutes.otpVerification,
               extra: {
                 'verificationId': verificationId,
                 'phoneNumber': _fullPhoneNumber,
                 'resendToken': resendToken,
-                'isSignIn': true, // Flag to indicate this is sign-in, not sign-up
+                'isSignUp': false,
+                'verificationType': 'signIn',
               },
             );
           }

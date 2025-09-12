@@ -23,14 +23,15 @@ import 'route_transitions.dart';
 
 class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
-  static push(String location, {dynamic extra}){
+
+  static push(String location, {dynamic extra}) {
     _rootNavigatorKey.currentContext?.push(location, extra: extra);
   }
+
   static GoRouter get router => GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: AppRoutes.splash,
     routes: [
-
       GoRoute(
         path: AppRoutes.splash,
         name: 'splash',
@@ -41,7 +42,6 @@ class AppRouter {
         ),
       ),
 
-
       GoRoute(
         path: AppRoutes.onboarding,
         name: 'onboarding',
@@ -50,9 +50,7 @@ class AppRouter {
           child: const OnboardingScreen(),
           transitionsBuilder: RouteTransitions.slidePullBackTransition,
         ),
-
       ),
-
 
       GoRoute(
         path: AppRoutes.auth,
@@ -63,7 +61,6 @@ class AppRouter {
           transitionsBuilder: RouteTransitions.slidePullBackTransition,
         ),
       ),
-
 
       GoRoute(
         path: AppRoutes.forgotPassword,
@@ -77,21 +74,36 @@ class AppRouter {
 
       GoRoute(
         path: AppRoutes.otpVerification,
-        name: 'otp-verification',
+        name: 'otpVerification',
         pageBuilder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>? ?? {};
+          final extra = state.extra as Map<String, dynamic>?;
+
+          if (extra == null) {
+            // Fallback if no extra data provided
+            return CustomTransitionPage(
+              key: state.pageKey,
+              child: const Scaffold(
+                body: Center(child: Text('Invalid verification data')),
+              ),
+              transitionsBuilder: RouteTransitions.slidePullBackTransition,
+            );
+          }
+
           return CustomTransitionPage(
             key: state.pageKey,
             child: OtpVerificationScreen(
-              phoneNumber: extra['phoneNumber'] as String? ?? '',
-              verificationId: extra['verificationId'] as String? ?? '',
-              verificationType: extra['verificationType'] as String?,
+              verificationId: extra['verificationId'] as String,
+              phoneNumber: extra['phoneNumber'] as String,
+              resendToken: extra['resendToken'] as int?,
+
+              isSignUp: extra['isSignUp'] as bool? ?? false,
+              verificationType:
+                  extra['verificationType'] as String? ?? 'signIn',
             ),
-            transitionsBuilder: RouteTransitions.slidePullBackTransition,
+            transitionsBuilder: RouteTransitions.slideTransition,
           );
         },
       ),
-
 
       GoRoute(
         path: AppRoutes.main,
@@ -103,7 +115,6 @@ class AppRouter {
         ),
       ),
 
-
       GoRoute(
         path: AppRoutes.editProfile,
         name: 'edit-profile',
@@ -113,7 +124,6 @@ class AppRouter {
           transitionsBuilder: RouteTransitions.slidePullBackTransition,
         ),
       ),
-
 
       GoRoute(
         path: AppRoutes.videoPlayer,
@@ -173,7 +183,6 @@ class AppRouter {
         },
       ),
 
-
       GoRoute(
         path: AppRoutes.createPost,
         name: 'create-post',
@@ -183,7 +192,6 @@ class AppRouter {
           transitionsBuilder: RouteTransitions.slidePullBackTransition,
         ),
       ),
-
 
       GoRoute(
         path: AppRoutes.postDetails,
@@ -198,7 +206,6 @@ class AppRouter {
         },
       ),
 
-
       GoRoute(
         path: AppRoutes.chatList,
         name: 'chat-list',
@@ -208,7 +215,6 @@ class AppRouter {
           transitionsBuilder: RouteTransitions.slidePullBackTransition,
         ),
       ),
-
 
       GoRoute(
         path: AppRoutes.chat,
@@ -227,7 +233,6 @@ class AppRouter {
         },
       ),
 
-
       GoRoute(
         path: AppRoutes.phoneSignIn,
         name: 'phone-signin',
@@ -237,7 +242,6 @@ class AppRouter {
           transitionsBuilder: RouteTransitions.slidePullBackTransition,
         ),
       ),
-
 
       GoRoute(
         path: AppRoutes.newPassword,
@@ -249,6 +253,7 @@ class AppRouter {
             child: NewPasswordScreen(
               phoneNumber: extra['phoneNumber'] as String? ?? '',
               verificationId: extra['verificationId'] as String?,
+              verifiedOtp: extra['verifiedOtp']as String,
             ),
             transitionsBuilder: RouteTransitions.slidePullBackTransition,
           );
@@ -275,8 +280,6 @@ class AppRouter {
         ),
       ),
     ],
-
-
 
     errorBuilder: (context, state) => Scaffold(
       body: Center(

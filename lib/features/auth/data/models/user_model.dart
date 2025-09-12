@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
 
 class UserModel extends Equatable {
@@ -67,6 +68,13 @@ class UserModel extends Equatable {
   }
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
+    final joinedAtRaw = map['joinedAt'];
+    final joinedAt = joinedAtRaw is Timestamp
+        ? joinedAtRaw.toDate()
+        : joinedAtRaw is String
+        ? DateTime.tryParse(joinedAtRaw) ?? DateTime.now()
+        : DateTime.now();
+
     return UserModel(
       id: map['id'] ?? '',
       email: map['email'] ?? '',
@@ -75,7 +83,7 @@ class UserModel extends Equatable {
       profilePictureUrl: map['profilePictureUrl'],
       bio: map['bio'],
       location: map['location'],
-      joinedAt: DateTime.parse(map['joinedAt'] ?? DateTime.now().toIso8601String()),
+      joinedAt:joinedAt,
       isEmailVerified: map['isEmailVerified'] ?? false,
       isPhoneVerified: map['isPhoneVerified'] ?? false,
     );

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/providers/app_providers.dart';
 import '../../../core/theme/app_colors.dart';
@@ -91,7 +92,6 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
                 ),
               ),
 
-
               tips.when(
                 data: (tipsList) {
                   final filteredTips = _filterTips(tipsList);
@@ -138,6 +138,7 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
                               onTap: () => _viewTipDetails(tip),
                               onSave: () => _toggleSaveTip(tip),
                               onLike: () => _toggleLikeTip(tip),
+                              onShare: () => _toggleShareTip(tip),
                             ),
                           );
                         },
@@ -491,6 +492,7 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
   }
 
   void _toggleSaveTip(Map<String, dynamic> tip) async {
+    print(tip);
     final tipId = tip['id'] as String;
     final userId = (await ref.read(currentUserProfileProvider.future))?.id;
     ref
@@ -500,7 +502,7 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Tip ${tip['isSaved'] ? 'removed from' : 'saved to'} bookmarks',
+          'Tip ${(tip['isSaved']??false) ? 'removed from' : 'saved to'} bookmarks',
         ),
         backgroundColor: AppColors.primaryGreen,
       ),
@@ -515,7 +517,25 @@ class _TipsScreenState extends ConsumerState<TipsScreen>
         .likeTip(tipId, userId ?? 'current_user_id');
   }
 
-  void _showSavedTips() {
-    context.push('/saved-tips');
+  void _toggleShareTip(Map<String, dynamic> tip) async {
+    final title = tip['title'] as String? ?? 'Farming Tip';
+    final content = tip['content'] as String? ?? '';
+    final category = tip['category'] as String? ?? 'general';
+    final difficulty = tip['difficulty'] as String? ?? 'beginner';
+
+    final shareText =
+        '''
+🌾 *$title*
+$content
+
+📌 Category: $category
+🎯 Difficulty: $difficulty
+
+Shared via Agrich App
+''';
+
+    SharePlus.instance.share(
+      ShareParams(title: 'Did you know?', text: shareText.trim()),
+    );
   }
 }

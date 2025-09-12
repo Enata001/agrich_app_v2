@@ -22,7 +22,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
     with TickerProviderStateMixin {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  // Separate form keys for each tab
+  final GlobalKey<FormState> _emailFormKey = GlobalKey<FormState>();
+  final GlobalKey<FormState> _phoneFormKey = GlobalKey<FormState>();
 
   late TabController _tabController;
   bool _isLoading = false;
@@ -136,84 +139,72 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
   }
 
   Widget _buildTabBar(BuildContext context) {
-    return FadeInUp(
-      duration: const Duration(milliseconds: 600),
-      delay: const Duration(milliseconds: 200),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.2),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TabBar(
+        controller: _tabController,
+        indicatorSize: TabBarIndicatorSize.tab,
+        indicator: BoxDecoration(
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: TabBar(
-          controller: _tabController,
-          indicatorSize: TabBarIndicatorSize.tab,
-          indicator: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+        labelColor: AppColors.primaryGreen,
+        unselectedLabelColor: Colors.white.withValues(alpha: 0.7),
+        labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+        dividerColor: Colors.transparent,
+        tabs: const [
+          Tab(
+            icon: Icon(Icons.email_outlined),
+            text: 'Email',
           ),
-          labelColor: AppColors.primaryGreen,
-          unselectedLabelColor: Colors.white.withValues(alpha: 0.7),
-          labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-          dividerColor: Colors.transparent,
-          tabs: const [
-            Tab(
-              icon: Icon(Icons.email_outlined),
-              text: 'Email',
-            ),
-            Tab(
-              icon: Icon(Icons.phone_outlined),
-              text: 'Phone',
-            ),
+          Tab(
+            icon: Icon(Icons.phone_outlined),
+            text: 'Phone',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmailResetTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Form(
+        key: _emailFormKey, // Use email-specific form key
+        child: Column(
+          children: [
+            if (!_isEmailSent) ...[
+              _buildEmailInputSection(),
+              const SizedBox(height: 30),
+              _buildResetButton(ResetMethod.email),
+            ] else ...[
+              _buildEmailSentState(),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildEmailResetTab() {
-    return FadeInUp(
-      duration: const Duration(milliseconds: 600),
-      delay: const Duration(milliseconds: 400),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              if (!_isEmailSent) ...[
-                _buildEmailInputSection(),
-                const SizedBox(height: 30),
-                _buildResetButton(ResetMethod.email),
-              ] else ...[
-                _buildEmailSentState(),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildPhoneResetTab() {
-    return FadeInUp(
-      duration: const Duration(milliseconds: 600),
-      delay: const Duration(milliseconds: 400),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              if (!_isPhoneCodeSent) ...[
-                _buildPhoneInputSection(),
-                const SizedBox(height: 30),
-                _buildResetButton(ResetMethod.phone),
-              ] else ...[
-                _buildPhoneCodeSentState(),
-              ],
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Form(
+        key: _phoneFormKey, // Use phone-specific form key
+        child: Column(
+          children: [
+            if (!_isPhoneCodeSent) ...[
+              _buildPhoneInputSection(),
+              const SizedBox(height: 30),
+              _buildResetButton(ResetMethod.phone),
+            ] else ...[
+              _buildPhoneCodeSentState(),
             ],
-          ),
+          ],
         ),
       ),
     );
@@ -344,7 +335,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
             controller: _phoneController,
             hint: 'Enter your phone number',
             onChanged: (phone) {
-            _fullPhoneNumber = phone;
+              _fullPhoneNumber = phone;
             },
             // validator: (value) {
             //   if (value == null || value.isEmpty) {
@@ -552,8 +543,11 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
   }
 
   Future<void> _handleReset(ResetMethod method) async {
-    if (!_formKey.currentState!.validate()) return;
-    // _fullPhoneNumber = _phoneController.text;
+    // Use the appropriate form key based on the current method
+    final formKey = method == ResetMethod.email ? _emailFormKey : _phoneFormKey;
+
+    if (!formKey.currentState!.validate()) return;
+
     setState(() => _isLoading = true);
 
     try {
@@ -598,6 +592,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
                     'verificationId': verificationId,
                     'phoneNumber': _fullPhoneNumber,
                     'resendToken': resendToken,
+                    'isSignUp': false,
                     'verificationType': 'passwordReset',
                   },
                 );

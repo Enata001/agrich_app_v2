@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
+import '../../../core/providers/app_providers.dart';
+import '../../../core/services/profile_image_service.dart';
 import '../../../core/theme/app_colors.dart';
 
 import '../../auth/data/models/user_model.dart';
@@ -460,6 +462,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     }
   }
 
+
+
   Future<void> _saveProfile(UserModel currentUser) async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -483,10 +487,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         updateData['profilePictureUrl'] = imageUrl;
       }
 
-      final authMethods = ref.read(authMethodsProvider);
-      await authMethods.updateUserProfile(currentUser.id, updateData);
+      if (updateData.containsKey('profilePictureUrl')) {
+        final profileImageService = ref.read(profileImageServiceProvider);
+        await profileImageService.updateProfileImageGlobally(
+          currentUser.id,
+          updateData['profilePictureUrl']!,
+        );
+      }
+        final authMethods = ref.read(authMethodsProvider);
+        await authMethods.updateUserProfile(currentUser.id, updateData);
 
-      // Refresh profile data
       ref.invalidate(currentUserProfileProvider);
 
       if (mounted) {

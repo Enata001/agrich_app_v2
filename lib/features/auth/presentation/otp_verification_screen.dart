@@ -1,30 +1,40 @@
+// lib/features/auth/presentation/otp_verification_screen.dart
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pinput/pinput.dart';
+import 'dart:async';
 
+import '../../../core/providers/app_providers.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
-
 import '../../shared/widgets/custom_button.dart';
 import '../../shared/widgets/gradient_background.dart';
 import '../providers/auth_provider.dart';
+import '../data/repositories/auth_repository.dart';
 
 class OtpVerificationScreen extends ConsumerStatefulWidget {
-  final String phoneNumber;
   final String verificationId;
-  final String? verificationType; // 🔥 NEW: Add verification type parameter
+  final String phoneNumber;
+  final int? resendToken;
+  final bool isSignUp;
+  final String verificationType; // 'linkToAccount', 'signIn', 'passwordReset'
 
   const OtpVerificationScreen({
-  super.key,
-  required this.phoneNumber,
-  required this.verificationId,
-    this.verificationType,
+    super.key,
+    required this.verificationId,
+    required this.phoneNumber,
+    this.resendToken,
+    required this.isSignUp,
+    required this.verificationType,
   });
+
   @override
-  ConsumerState<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
+  ConsumerState<OtpVerificationScreen> createState() =>
+      _OtpVerificationScreenState();
 }
 
 class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
@@ -36,14 +46,16 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
   late Animation<double> _timerAnimation;
 
   bool _isVerifying = false;
+  bool _canResend = false;
   int _resendCountdown = 60;
   String _otpCode = '';
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     _setupTimer();
-    _startCountdown();
+    _startResendTimer();
   }
 
   void _setupTimer() {
@@ -52,23 +64,32 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
       vsync: this,
     );
 
-    _timerAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(parent: _timerController, curve: Curves.linear),
-    );
+    _timerAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(parent: _timerController, curve: Curves.linear));
   }
 
-  void _startCountdown() {
+  void _startResendTimer() {
+    setState(() {
+      _canResend = false;
+      _resendCountdown = 60;
+    });
+
+    _timerController.reset();
     _timerController.forward();
 
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 1));
-      if (mounted) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_resendCountdown > 0) {
         setState(() {
           _resendCountdown--;
         });
-        return _resendCountdown > 0;
+      } else {
+        setState(() {
+          _canResend = true;
+        });
+        timer.cancel();
       }
-      return false;
     });
   }
 
@@ -77,6 +98,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     _pinController.dispose();
     _pinFocusNode.dispose();
     _timerController.dispose();
+    _timer?.cancel();
     super.dispose();
   }
 
@@ -87,6 +109,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
       height: 60,
       textStyle: Theme.of(context).textTheme.headlineSmall?.copyWith(
         fontWeight: FontWeight.bold,
+        color: AppColors.primaryGreen,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -98,261 +121,318 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     final focusedPinTheme = defaultPinTheme.copyWith(
       decoration: defaultPinTheme.decoration!.copyWith(
         border: Border.all(color: AppColors.primaryGreen, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryGreen.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
     );
 
     final submittedPinTheme = defaultPinTheme.copyWith(
       decoration: defaultPinTheme.decoration!.copyWith(
-        color: AppColors.primaryGreen.withValues(alpha: 0.1),
+        color: AppColors.primaryGreen.withOpacity(0.1),
         border: Border.all(color: AppColors.primaryGreen, width: 2),
       ),
     );
 
-    return CustomScaffold(
-      showGradient: true,
-      appBar: AppBar(
+    return GradientBackground(
+      child: Scaffold(
         backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: () => context.pop(),
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => _handleBackNavigation(),
+          ),
+          title: const Text(
+            'Verify Phone',
+            style: TextStyle(color: Colors.white),
+          ),
+          centerTitle: true,
         ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const SizedBox(height: 40),
-
-              // Header
-              FadeInDown(
-                duration: const Duration(milliseconds: 600),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(40),
-                      ),
-                      child: const Icon(
-                        Icons.sms,
-                        size: 40,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Verification Code',
-                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    RichText(
-                      textAlign: TextAlign.center,
-                      text: TextSpan(
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          height: 1.5,
-                        ),
-                        children: [
-                          const TextSpan(text: 'We sent a verification code to\n'),
-                          TextSpan(
-                            text: widget.phoneNumber,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                const SizedBox(height: 40),
+                _buildHeader(),
+                const SizedBox(height: 50),
+                _buildOtpField(
+                  defaultPinTheme,
+                  focusedPinTheme,
+                  submittedPinTheme,
                 ),
-              ),
-
-              const SizedBox(height: 60),
-
-              // PIN Input
-              FadeInUp(
-                duration: const Duration(milliseconds: 600),
-                delay: const Duration(milliseconds: 200),
-                child: Pinput(
-                  length: 6,
-                  controller: _pinController,
-                  focusNode: _pinFocusNode,
-                  defaultPinTheme: defaultPinTheme,
-                  focusedPinTheme: focusedPinTheme,
-                  submittedPinTheme: submittedPinTheme,
-                  separatorBuilder: (index) => const SizedBox(width: 8),
-                  onChanged: (value) {
-                    setState(() {
-                      _otpCode = value;
-                    });
-                  },
-                  onCompleted: (value) {
-                    _verifyOtp();
-                  },
-                  cursor: Container(
-                    width: 2,
-                    height: 24,
-                    color: AppColors.primaryGreen,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // Verify Button
-              FadeInUp(
-                duration: const Duration(milliseconds: 600),
-                delay: const Duration(milliseconds: 400),
-                child: CustomButton(
-                  text: 'Verify Code',
-                  onPressed: _otpCode.length == 6 ? _verifyOtp : null,
-                  isLoading: _isVerifying,
-                  width: double.infinity,
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // Resend Section
-              FadeInUp(
-                duration: const Duration(milliseconds: 600),
-                delay: const Duration(milliseconds: 600),
-                child: Column(
-                  children: [
-                    if (_resendCountdown > 0) ...[
-                      Text(
-                        'Didn\'t receive the code?',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.7),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Resend in ',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.white.withValues(alpha: 0.7),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${_resendCountdown}s',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      // Progress indicator
-                      Container(
-                        width: 200,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                        child: AnimatedBuilder(
-                          animation: _timerAnimation,
-                          builder: (context, child) {
-                            return FractionallySizedBox(
-                              alignment: Alignment.centerLeft,
-                              widthFactor: _timerAnimation.value,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ] else ...[
-                      Text(
-                        'Didn\'t receive the code?',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.7),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: _resendOtp,
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          backgroundColor: Colors.white.withValues(alpha: 0.2),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 12,
-                          ),
-                        ),
-                        child: const Text('Resend Code'),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              // Help text
-              FadeIn(
-                duration: const Duration(milliseconds: 800),
-                delay: const Duration(milliseconds: 800),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: Colors.white.withValues(alpha: 0.7),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Make sure to check your messages and enter the 6-digit code we sent.',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.7),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+                const SizedBox(height: 30),
+                _buildVerifyButton(),
+                const SizedBox(height: 20),
+                _buildResendSection(),
+                const SizedBox(height: 30),
+                _buildInfoCard(),
+                const SizedBox(height: 20),
+                if (widget.verificationType == 'linkToAccount')
+                  _buildSkipWarning(),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+
+  Widget _buildHeader() {
+    return FadeInDown(
+      duration: const Duration(milliseconds: 600),
+      child: Column(
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(40),
+            ),
+            child: const Icon(Icons.sms, size: 40, color: Colors.white),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Verification Code',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          RichText(
+            textAlign: TextAlign.center,
+            text: TextSpan(
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.white.withOpacity(0.8),
+              ),
+              children: [
+                const TextSpan(text: 'Enter the 6-digit code sent to\n'),
+                TextSpan(
+                  text: widget.phoneNumber,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOtpField(
+    PinTheme defaultTheme,
+    PinTheme focusedTheme,
+    PinTheme submittedTheme,
+  ) {
+    return FadeInUp(
+      duration: const Duration(milliseconds: 600),
+      delay: const Duration(milliseconds: 200),
+      child: Pinput(
+        length: 6,
+        controller: _pinController,
+        focusNode: _pinFocusNode,
+        defaultPinTheme: defaultTheme,
+        focusedPinTheme: focusedTheme,
+        submittedPinTheme: submittedTheme,
+        separatorBuilder: (index) => const SizedBox(width: 8),
+        onChanged: (value) {
+          setState(() {
+            _otpCode = value;
+          });
+        },
+        onCompleted: (value) {
+          _verifyOtp();
+        },
+        cursor: Container(width: 2, height: 24, color: AppColors.primaryGreen),
+      ),
+    );
+  }
+
+  Widget _buildVerifyButton() {
+    return FadeInUp(
+      duration: const Duration(milliseconds: 600),
+      delay: const Duration(milliseconds: 400),
+      child: CustomButton(
+        text: _isVerifying ? 'Verifying...' : 'Verify Code',
+        onPressed: (_isVerifying || _otpCode.length != 6) ? null : _verifyOtp,
+        isLoading: _isVerifying,
+      ),
+    );
+  }
+
+  Widget _buildResendSection() {
+    return FadeInUp(
+      duration: const Duration(milliseconds: 600),
+      delay: const Duration(milliseconds: 600),
+      child: Column(
+        children: [
+          Text(
+            "Didn't receive the code?",
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Colors.white.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (_canResend)
+            TextButton(
+              onPressed: _resendOtp,
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.white.withOpacity(0.2),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+              ),
+              child: const Text('Resend Code'),
+            )
+          else
+            Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Resend in ',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white.withOpacity(0.7),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${_resendCountdown}s',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: 200,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                  child: AnimatedBuilder(
+                    animation: _timerAnimation,
+                    builder: (context, child) {
+                      return FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: _timerAnimation.value,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard() {
+    return FadeInUp(
+      duration: const Duration(milliseconds: 600),
+      delay: const Duration(milliseconds: 800),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.info_outline,
+              color: Colors.white.withOpacity(0.7),
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Make sure to check your messages and enter the 6-digit code we sent.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withOpacity(0.7),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkipWarning() {
+    return FadeInUp(
+      duration: const Duration(milliseconds: 600),
+      delay: const Duration(milliseconds: 1000),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.red.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.red.withOpacity(0.3)),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Icon(Icons.warning_rounded, color: Colors.red[300], size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Verification Required',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Phone verification is mandatory to complete your account setup. Skipping this step will result in account deletion.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white.withOpacity(0.9),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==================== VERIFICATION LOGIC ====================
 
   Future<void> _verifyOtp() async {
     if (_otpCode.length != 6) return;
@@ -360,13 +440,12 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     setState(() => _isVerifying = true);
 
     try {
-      final authMethods = ref.read(authMethodsProvider);
+      final authRepository = ref.read(authRepositoryProvider);
 
-      // 🔥 FIXED: Handle different verification types
       switch (widget.verificationType) {
         case 'linkToAccount':
-        // Link phone to existing email account
-          await authMethods.linkPhoneToEmailAccount(
+          // Link phone to existing email account (signup completion)
+          await authRepository.linkPhoneToEmailAccount(
             widget.phoneNumber,
             widget.verificationId,
             _otpCode,
@@ -375,7 +454,17 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Phone number linked successfully!'),
+                content: Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.white),
+                    SizedBox(width: 8),
+                    Text(
+                      'Account created and verified successfully!',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ],
+                ),
                 backgroundColor: AppColors.success,
               ),
             );
@@ -384,8 +473,8 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
           break;
 
         case 'signIn':
-        // Direct phone sign-in
-          await authMethods.signInWithPhoneOTP(
+          // Direct phone sign-in
+          await authRepository.signInWithPhoneOTP(
             widget.phoneNumber,
             widget.verificationId,
             _otpCode,
@@ -403,13 +492,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
           break;
 
         case 'passwordReset':
-
-          await authMethods.signInWithPhoneOTP(
-            widget.phoneNumber,
-            widget.verificationId,
-            _otpCode,
-          );
-
+          // Phone verification for password reset
           if (mounted) {
             context.pushReplacement(
               AppRoutes.newPassword,
@@ -423,11 +506,11 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
           break;
 
         default:
-        // Default behavior - try to determine from context
+          // Fallback - determine from context
           final currentUser = ref.read(currentUserProvider);
           if (currentUser != null) {
             // User is signed in, so this is likely a linking operation
-            await authMethods.linkPhoneToEmailAccount(
+            await authRepository.linkPhoneToEmailAccount(
               widget.phoneNumber,
               widget.verificationId,
               _otpCode,
@@ -436,7 +519,9 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Phone number linked successfully!'),
+                  content: Text(
+                    'Phone number verified and linked successfully!',
+                  ),
                   backgroundColor: AppColors.success,
                 ),
               );
@@ -444,7 +529,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
             }
           } else {
             // No user signed in, so this is a sign-in operation
-            await authMethods.signInWithPhoneOTP(
+            await authRepository.signInWithPhoneOTP(
               widget.phoneNumber,
               widget.verificationId,
               _otpCode,
@@ -460,12 +545,13 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
               context.go(AppRoutes.main);
             }
           }
+          break;
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Verification failed: $e'),
+            content: Text(e.toString()),
             backgroundColor: AppColors.error,
           ),
         );
@@ -483,18 +569,26 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     }
   }
 
-  // 🔥 FIXED: Resend OTP with proper phone number
   Future<void> _resendOtp() async {
-    setState(() => _isVerifying = true);
-
     try {
-      final authMethods = ref.read(authMethodsProvider);
+      // Reset timer
+      _startResendTimer();
 
-      await authMethods.verifyPhoneNumber(
+      // Show loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sending new verification code...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Trigger resend using Firebase Auth
+      await FirebaseAuth.instance.verifyPhoneNumber(
         phoneNumber: widget.phoneNumber,
-        verificationCompleted: (PhoneAuthCredential credential) {
-          // Handle auto-verification if it happens again
-          _handleAutoVerification(credential);
+        forceResendingToken: widget.resendToken,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          // Handle auto-verification
+          await _handleAutoVerification(credential);
         },
         verificationFailed: (FirebaseAuthException e) {
           if (mounted) {
@@ -508,21 +602,12 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
         },
         codeSent: (String verificationId, int? resendToken) {
           if (mounted) {
-            // Update the verification ID
-            setState(() {
-              // You might need to update the verification ID here
-              // This would require making verificationId mutable
-            });
-
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('New verification code sent!'),
                 backgroundColor: AppColors.success,
               ),
             );
-
-            // Restart the countdown
-            _startCountdown();
           }
         },
         codeAutoRetrievalTimeout: (String verificationId) {
@@ -538,31 +623,26 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
           ),
         );
       }
-    } finally {
-      if (mounted) {
-        setState(() => _isVerifying = false);
-      }
     }
   }
 
-  // 🔥 NEW: Handle auto-verification during resend
   Future<void> _handleAutoVerification(PhoneAuthCredential credential) async {
     try {
-      final authMethods = ref.read(authMethodsProvider);
+      final authRepository = ref.read(authRepositoryProvider);
 
       switch (widget.verificationType) {
         case 'linkToAccount':
-          await authMethods.linkPhoneCredentialToEmailAccount(credential);
+          await authRepository.linkPhoneCredentialToEmailAccount(credential);
           break;
         case 'signIn':
-          await authMethods.signInWithPhoneCredential(credential);
+          await authRepository.signInWithPhoneCredential(credential);
           break;
         default:
           final currentUser = ref.read(currentUserProvider);
           if (currentUser != null) {
-            await authMethods.linkPhoneCredentialToEmailAccount(credential);
+            await authRepository.linkPhoneCredentialToEmailAccount(credential);
           } else {
-            await authMethods.signInWithPhoneCredential(credential);
+            await authRepository.signInWithPhoneCredential(credential);
           }
       }
 
@@ -584,6 +664,51 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
           ),
         );
       }
+    }
+  }
+
+  void _handleBackNavigation() {
+    if (widget.verificationType == 'linkToAccount') {
+      // Warn user about incomplete account
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Cancel Verification?'),
+          content: const Text(
+            'Going back will cancel your account creation. Your account will be deleted and you\'ll need to start over.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Continue Verification'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context); // Close dialog
+
+                // Delete the incomplete account
+                final user = ref.read(currentUserProvider);
+                if (user != null) {
+                  try {
+                    await user.delete();
+                    await ref.read(localStorageServiceProvider).clearUserData();
+                  } catch (e) {
+                    print('Error deleting incomplete account: $e');
+                  }
+                }
+
+                if (mounted) {
+                  context.go(AppRoutes.auth);
+                }
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Cancel & Delete'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      context.pop();
     }
   }
 }

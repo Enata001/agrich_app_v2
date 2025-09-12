@@ -6,7 +6,7 @@ import '../config/app_config.dart';
 class LocalStorageService {
   final SharedPreferences _prefs;
 
-  // Cache expiration durations
+
   static const Duration _defaultCacheExpiration = Duration(hours: 1);
   static const Duration _userDataCacheExpiration = Duration(days: 7);
   static const Duration _postsCacheExpiration = Duration(minutes: 30);
@@ -15,7 +15,7 @@ class LocalStorageService {
 
   LocalStorageService(this._prefs);
 
-  // ================ CACHE MANAGEMENT WITH EXPIRATION ================
+
 
   Future<bool> setCachedData(
       String key,
@@ -127,10 +127,10 @@ class LocalStorageService {
   }
 
   bool _isIsoDate(String value) {
-    // Basic check for ISO format
+
     return RegExp(r'^\d{4}-\d{2}-\d{2}T').hasMatch(value);
   }
-  // ================ USER DATA ================
+
 
   Future<bool> setUserData(Map<String, dynamic> userData) async {
     return await setCachedData(
@@ -139,6 +139,17 @@ class LocalStorageService {
       expiration: _userDataCacheExpiration,
     );
   }
+
+  Future<void> clearAllExceptOnboarding() async {
+    final onboardingStatus = isOnboardingComplete();
+
+
+    await _prefs.clear();
+
+
+    await setOnboardingComplete(onboardingStatus);
+  }
+
 
   Map<String, dynamic>? getUserData() {
     return getCachedData(CacheKeys.userData);
@@ -153,7 +164,7 @@ class LocalStorageService {
 
     video.forEach((key, value) {
       if (value is Timestamp) {
-        sanitized[key] = value.toDate().toIso8601String(); // or value.seconds
+        sanitized[key] = value.toDate().toIso8601String();
       } else {
         sanitized[key] = value;
       }
@@ -165,13 +176,13 @@ class LocalStorageService {
     print("caching $video");
     final watchedVideos = getWatchedVideos();
 
-    // Remove if already exists
+
     watchedVideos.removeWhere((v) => v['id'] == video['id']);
 
-    // Add to beginning
+
     watchedVideos.insert(0, _sanitizeForCache(video));
 
-    // Keep only 10 most recent
+
     if (watchedVideos.length > 10) {
       watchedVideos.removeRange(10, watchedVideos.length);
     }
@@ -198,7 +209,7 @@ class LocalStorageService {
     return await _prefs.remove(CacheKeys.watchedVideos);
   }
 
-  // ================ CACHED POSTS ================
+
 
   Future<bool> setCachedPosts(List<Map<String, dynamic>> posts) async {
     return await setCachedList(
@@ -212,7 +223,7 @@ class LocalStorageService {
     return getCachedList(CacheKeys.cachedPosts);
   }
 
-  // ================ CACHED TIPS ================
+
 
   Future<bool> setCachedTips(List<Map<String, dynamic>> tips) async {
     return await setCachedList(CacheKeys.cachedTips, tips, expiration: _tipsCacheExpiration);
@@ -230,7 +241,7 @@ class LocalStorageService {
     return getCachedList('${CacheKeys.cachedTips}_$category');
   }
 
-  // ================ CACHED CHATS ================
+
 
   Future<bool> setCachedUserChats(String userId, List<Map<String, dynamic>> chats) async {
     return await setCachedList('${CacheKeys.userChats}_$userId', chats, expiration: _chatCacheExpiration);
@@ -248,7 +259,7 @@ class LocalStorageService {
     return getCachedList('${CacheKeys.chatMessages}_$chatId');
   }
 
-  // ================ WEATHER DATA ================
+
 
   Future<bool> setWeatherData(Map<String, dynamic> weather) async {
     return await setCachedData(CacheKeys.weatherData, weather, expiration: const Duration(minutes: 30));
@@ -258,7 +269,7 @@ class LocalStorageService {
     return getCachedData(CacheKeys.weatherData);
   }
 
-  // ================ LEGACY METHODS ================
+
 
   bool isOnboardingComplete() {
     return _prefs.getBool(CacheKeys.onboardingComplete) ?? false;
@@ -298,7 +309,7 @@ class LocalStorageService {
 
     tip.forEach((key, value) {
       if (value is DateTime) {
-        sanitized[key] = value.toIso8601String(); // or value.millisecondsSinceEpoch
+        sanitized[key] = value.toIso8601String();
       } else {
         sanitized[key] = value;
       }
@@ -311,7 +322,7 @@ class LocalStorageService {
     final safeTip = sanitizeTip(tip);
     return await setCachedData(CacheKeys.dailyTip, safeTip, expiration: const Duration(hours: 24));
   }
-  // ================ CACHE CLEANUP ================
+
 
   Future<void> clearExpiredCache() async {
     final allKeys = _prefs.getKeys();
@@ -348,7 +359,7 @@ class LocalStorageService {
 
 
 
-  // Generic Methods
+
   Future<bool> setString(String key, String value) async {
     return await _prefs.setString(key, value);
   }

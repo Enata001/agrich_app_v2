@@ -1,24 +1,40 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../../../core/providers/app_providers.dart';
+import '../../../../core/services/location_service.dart';
 import '../../../../core/services/network_service.dart' hide networkServiceProvider;
-
-// Current Weather Provider
-
 
 final currentWeatherProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
   final weatherRepository = ref.watch(weatherRepositoryProvider);
+  final networkService = ref.watch(networkServiceProvider);
 
   try {
-    print('🌤️ Weather provider: Starting fetch...');
-    final weatherData = await weatherRepository.getCurrentWeatherWithFallback();
-    print('✅ Weather provider: Data received - ${weatherData['city']} ${weatherData['temperature']}°C');
-    return weatherData;
+    // Check if online first
+    final isOnline = await networkService.checkConnectivity();
+
+    if (isOnline) {
+      // Try to get weather with location
+      final locationResult = await LocationService.getCurrentLocationWithResult();
+
+      if (locationResult.isSuccess && locationResult.position != null) {
+        print('🌍 Using current location for weather');
+        return await weatherRepository.getWeatherByCoordinates(
+          locationResult.position!.latitude,
+          locationResult.position!.longitude,
+        );
+      } else {
+        print('📍 Location failed: ${locationResult.error}, using default location');
+        // Fallback to default location (Accra)
+        return await weatherRepository.getWeatherByCity('Accra');
+      }
+    } else {
+      return await weatherRepository.getCurrentWeatherWithFallback();
+    }
   } catch (e) {
-    print('❌ Weather provider error: $e');
-    rethrow;
+    print('🌤️ Weather provider error: $e');
+    return await weatherRepository.getCurrentWeatherWithFallback();
   }
 });
-
 // ✅ Weather forecast provider
 final weatherForecastProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, int>((ref, days) async {
   final weatherRepository = ref.watch(weatherRepositoryProvider);
@@ -58,6 +74,34 @@ final farmingAdviceProvider = FutureProvider<String>((ref) async {
     return 'Weather data unavailable for farming recommendations.';
   }
 });
+
+// Location-aware weather provider for specific coordinates
+final weatherByLocationProvider = FutureProvider.family.autoDispose<Map<String, dynamic>, Position>((ref, position) async {
+  final weatherRepository = ref.watch(weatherRepositoryProvider);
+
+  return await weatherRepository.getWeatherByCoordinates(
+    position.latitude,
+    position.longitude,
+  );
+});
+
+// City-based weather provider
+final weatherByCityProvider = FutureProvider.family.autoDispose<Map<String, dynamic>, String>((ref, cityName) async {
+  final weatherRepository = ref.watch(weatherRepositoryProvider);
+
+  return await weatherRepository.getWeatherByCity(cityName);
+});
+
+// Location permission status provider
+final locationPermissionProvider = FutureProvider.autoDispose<LocationPermissionResult>((ref) async {
+  return await LocationService.requestLocationPermission();
+});
+
+// Current location provider
+final currentLocationProvider = FutureProvider.autoDispose<Position?>((ref) async {
+  return await LocationService.getCurrentLocation();
+});
+
 
 // Farming Weather Condition Provider
 final isFarmingWeatherGoodProvider = FutureProvider<bool>((ref) async {

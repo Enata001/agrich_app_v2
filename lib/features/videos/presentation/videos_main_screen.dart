@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animate_do/animate_do.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/app_providers.dart';
-import '../../../core/services/network_service.dart' hide networkServiceProvider;
+import '../../../core/services/network_service.dart'
+    hide networkServiceProvider;
 import '../../../core/theme/app_colors.dart';
 import '../../auth/data/models/user_model.dart';
 import '../../shared/widgets/gradient_background.dart';
@@ -30,7 +32,6 @@ class _VideosMainScreenState extends ConsumerState<VideosMainScreen>
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   late AnimationController _headerAnimationController;
-  late Animation<double> _headerAnimation;
 
   String _selectedCategory = 'All';
   String _selectedFilter = 'recent'; // recent, popular, trending
@@ -44,10 +45,6 @@ class _VideosMainScreenState extends ConsumerState<VideosMainScreen>
     _headerAnimationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
-    );
-    _headerAnimation = CurvedAnimation(
-      parent: _headerAnimationController,
-      curve: Curves.easeInOut,
     );
 
     _scrollController.addListener(_onScroll);
@@ -90,7 +87,6 @@ class _VideosMainScreenState extends ConsumerState<VideosMainScreen>
             children: [
               // Animated Header
               _buildHeader(context),
-
 
               // Search Bar (when active)
               if (_showSearch) _buildSearchBar(),
@@ -157,10 +153,6 @@ class _VideosMainScreenState extends ConsumerState<VideosMainScreen>
                 _showSearch ? Icons.close : Icons.search,
                 color: Colors.white,
               ),
-            ),
-            IconButton(
-              onPressed: () => _showFilterMenu(),
-              icon: const Icon(Icons.tune, color: Colors.white),
             ),
           ],
         ),
@@ -462,9 +454,7 @@ class _VideosMainScreenState extends ConsumerState<VideosMainScreen>
 
   Widget _buildErrorState(Object error) {
     if (error is NetworkException) {
-      return VideoNetworkErrorWidget(
-        onRetry: () => _refreshVideos(),
-      );
+      return VideoNetworkErrorWidget(onRetry: () => _refreshVideos());
     }
 
     return NetworkErrorWidget(
@@ -628,135 +618,12 @@ class _VideosMainScreenState extends ConsumerState<VideosMainScreen>
 
   void _shareVideo(Map<String, dynamic> video) {
     final videoTitle = video['title'] as String? ?? 'Farming Video';
-    final videoId = video['id'] as String;
-    // Share.share('Check out this farming video: $videoTitle\nhttps://agrich.app/videos/$videoId');
-  }
-
-  void _showFilterMenu() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.tune, color: AppColors.primaryGreen),
-                const SizedBox(width: 12),
-                Text(
-                  'Filter Videos',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Sort options
-            Text(
-              'Sort by',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            _buildFilterOption('Recent', 'recent', Icons.access_time),
-            _buildFilterOption('Popular', 'popular', Icons.trending_up),
-            _buildFilterOption('Trending', 'trending', Icons.whatshot),
-            const SizedBox(height: 20),
-            Text(
-              'Category',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: ['All', ...AppConfig.videoCategories].map((category) {
-                final isSelected = _selectedCategory == category;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() => _selectedCategory = category);
-                    Navigator.pop(context);
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppColors.primaryGreen.withValues(alpha: 0.1)
-                          : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(16),
-                      border: isSelected
-                          ? Border.all(color: AppColors.primaryGreen, width: 1)
-                          : null,
-                    ),
-                    child: Text(
-                      category,
-                      style: TextStyle(
-                        color: isSelected
-                            ? AppColors.primaryGreen
-                            : AppColors.textPrimary,
-                        fontWeight: isSelected
-                            ? FontWeight.w600
-                            : FontWeight.w500,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
+    SharePlus.instance.share(
+      ShareParams(
+        title: 'Check out this farming video: $videoTitle',
+        text: video['videoUrl'],
       ),
     );
   }
 
-  Widget _buildFilterOption(String title, String value, IconData icon) {
-    final isSelected = _selectedFilter == value;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(
-          icon,
-          color: isSelected ? AppColors.primaryGreen : Colors.grey.shade600,
-        ),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            color: isSelected ? AppColors.primaryGreen : AppColors.textPrimary,
-          ),
-        ),
-        trailing: isSelected
-            ? Icon(Icons.check, color: AppColors.primaryGreen)
-            : null,
-        onTap: () {
-          setState(() => _selectedFilter = value);
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
 }

@@ -109,10 +109,6 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                 onPressed: () => setState(() => _showSearch = true),
                 icon: const Icon(Icons.search, color: Colors.white),
               ),
-              IconButton(
-                onPressed: () => _showFilterBottomSheet(context),
-                icon: const Icon(Icons.tune, color: Colors.white),
-              ),
             ],
           ],
         ),

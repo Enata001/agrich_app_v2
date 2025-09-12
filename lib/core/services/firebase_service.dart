@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:agrich_app_v2/core/providers/app_providers.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/app_config.dart';
@@ -22,13 +23,21 @@ class FirebaseService {
   }
 
   Future<DocumentSnapshot> getUser(String uid) async {
-    return await _firestore
+    if(FirebaseAuth.instance.currentUser == null) {
+      await FirebaseAuth.instance.signInAnonymously();
+    }
+    final data  =await _firestore
         .collection(AppConfig.usersCollection)
         .doc(uid)
         .get();
+
+    return data;
   }
 
   Future<QuerySnapshot> getUserByPhone(String phoneNumber) async {
+    if(FirebaseAuth.instance.currentUser == null) {
+      await FirebaseAuth.instance.signInAnonymously();
+    }
     return await _firestore
         .collection(AppConfig.usersCollection)
         .where('phoneNumber', isEqualTo: phoneNumber)

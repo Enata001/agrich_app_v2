@@ -123,10 +123,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               child: CircleAvatar(
                 radius: 38,
                 backgroundColor: Colors.white,
-                backgroundImage: user.profilePictureUrl != null
+                backgroundImage: user.profilePictureUrl  != null && user.profilePictureUrl!.isNotEmpty
                     ? CachedNetworkImageProvider(user.profilePictureUrl!)
                     : null,
-                child: user.profilePictureUrl == null
+                child: user.profilePictureUrl  != null && user.profilePictureUrl!.isEmpty
                     ? Text(
                   user.username.isNotEmpty
                       ? user.username.substring(0, 1).toUpperCase()
@@ -186,24 +186,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                   Row(
                     children: [
                       Icon(
-                        user.isEmailVerified ? Icons.verified : Icons.pending,
-                        color: user.isEmailVerified ? Colors.green : Colors.orange,
+                        user.isPhoneVerified ? Icons.verified : Icons.pending,
+                        color: user.isPhoneVerified ? Colors.greenAccent : Colors.orange,
                         size: 16,
                       ),
                       const SizedBox(width: 4),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: user.isEmailVerified
-                              ? Colors.green.withValues(alpha: 0.2)
+                          color: user.isPhoneVerified
+                              ? Colors.greenAccent.withValues(alpha: 0.2)
                               : Colors.orange.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          user.isEmailVerified ? 'Verified' : 'Unverified',
+                          user.isPhoneVerified? 'Verified' : 'Unverified',
                           style: TextStyle(
-                            color: user.isEmailVerified
-                                ? Colors.green
+                            color: user.isPhoneVerified
+                                ? Colors.greenAccent
                                 : Colors.orange,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -554,7 +554,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               decoration: BoxDecoration(
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                 color: Colors.grey[200],
-                image: video['thumbnailUrl'] != null
+                image: video['thumbnailUrl'] != null || video['thumbnailUrl'].toString().isNotEmpty
                     ? DecorationImage(
                   image: CachedNetworkImageProvider(video['thumbnailUrl']),
                   fit: BoxFit.cover,

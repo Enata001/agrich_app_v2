@@ -1,3 +1,5 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:animate_do/animate_do.dart';
@@ -12,12 +14,14 @@ import '../providers/auth_provider.dart';
 
 class NewPasswordScreen extends ConsumerStatefulWidget {
   final String phoneNumber;
-  final String? verificationId; // Optional - only for phone-based reset
+  final String? verificationId;
+  final String verifiedOtp;
 
   const NewPasswordScreen({
     super.key,
     required this.phoneNumber,
     this.verificationId,
+    required this.verifiedOtp,
   });
 
   @override
@@ -26,7 +30,8 @@ class NewPasswordScreen extends ConsumerStatefulWidget {
 
 class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
   final TextEditingController _newPasswordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   bool _isLoading = false;
@@ -51,7 +56,7 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
               // Header
               _buildHeader(context),
 
-              const SizedBox(height: 40),
+              const SizedBox(height: 20),
 
               Expanded(
                 child: SingleChildScrollView(
@@ -62,12 +67,12 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
                         // Password Input Section
                         _buildPasswordInputSection(context),
 
-                        const SizedBox(height: 40),
+                        const SizedBox(height: 20),
 
                         // Update Password Button
                         _buildUpdatePasswordButton(context),
 
-                        const SizedBox(height: 30),
+                        const SizedBox(height: 20),
 
                         // Security Tips
                         _buildSecurityTips(context),
@@ -97,7 +102,7 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
               const Spacer(),
             ],
           ),
-          const SizedBox(height: 20),
+          // const SizedBox(height: 20),
           Container(
             width: 80,
             height: 80,
@@ -111,7 +116,7 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
               color: Colors.white,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           Text(
             'Create New Password',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -137,11 +142,7 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.verified_user,
-                  color: Colors.white,
-                  size: 16,
-                ),
+                Icon(Icons.verified_user, color: Colors.white, size: 16),
                 const SizedBox(width: 6),
                 Text(
                   'Verified: ${widget.phoneNumber}',
@@ -178,22 +179,16 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Set New Password',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 20),
-
             // New Password Field
             CustomInputField(
               label: 'New Password',
               hint: 'Enter your new password',
               controller: _newPasswordController,
               obscureText: _obscureNewPassword,
-              prefixIcon: const Icon(Icons.lock_outline, color: AppColors.primaryGreen),
+              prefixIcon: const Icon(
+                Icons.lock_outline,
+                color: AppColors.primaryGreen,
+              ),
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscureNewPassword ? Icons.visibility_off : Icons.visibility,
@@ -206,7 +201,8 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
                 },
               ),
               validator: _validateNewPassword,
-              onChanged: (value) => setState(() {}), // Trigger rebuild for strength indicator
+              onChanged: (value) =>
+                  setState(() {}), // Trigger rebuild for strength indicator
             ),
 
             const SizedBox(height: 8),
@@ -222,10 +218,15 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
               hint: 'Confirm your new password',
               controller: _confirmPasswordController,
               obscureText: _obscureConfirmPassword,
-              prefixIcon: const Icon(Icons.lock_outline, color: AppColors.primaryGreen),
+              prefixIcon: const Icon(
+                Icons.lock_outline,
+                color: AppColors.primaryGreen,
+              ),
               suffixIcon: IconButton(
                 icon: Icon(
-                  _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                  _obscureConfirmPassword
+                      ? Icons.visibility_off
+                      : Icons.visibility,
                   color: Colors.grey.shade600,
                 ),
                 onPressed: () {
@@ -235,6 +236,7 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
                 },
               ),
               validator: _validateConfirmPassword,
+              onChanged: (value) => setState(() {}),
             ),
           ],
         ),
@@ -253,9 +255,9 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
           children: [
             Text(
               'Password Strength: ',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.grey.shade600,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
             ),
             Text(
               _getStrengthText(strength),
@@ -270,7 +272,9 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
         LinearProgressIndicator(
           value: strength / 4.0,
           backgroundColor: Colors.grey.shade300,
-          valueColor: AlwaysStoppedAnimation<Color>(_getStrengthColor(strength)),
+          valueColor: AlwaysStoppedAnimation<Color>(
+            _getStrengthColor(strength),
+          ),
         ),
         const SizedBox(height: 8),
         _buildPasswordRequirements(password),
@@ -280,10 +284,7 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
 
   Widget _buildPasswordRequirements(String password) {
     final requirements = [
-      {
-        'text': 'At least 8 characters',
-        'met': password.length >= 8,
-      },
+      {'text': 'At least 8 characters', 'met': password.length >= 8},
       {
         'text': 'Contains uppercase letter',
         'met': password.contains(RegExp(r'[A-Z]')),
@@ -292,10 +293,7 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
         'text': 'Contains lowercase letter',
         'met': password.contains(RegExp(r'[a-z]')),
       },
-      {
-        'text': 'Contains number',
-        'met': password.contains(RegExp(r'[0-9]')),
-      },
+      {'text': 'Contains number', 'met': password.contains(RegExp(r'[0-9]'))},
       {
         'text': 'Contains special character',
         'met': password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]')),
@@ -335,7 +333,9 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
       delay: const Duration(milliseconds: 400),
       child: CustomButton(
         text: _isLoading ? 'Updating Password...' : 'Update Password',
-        onPressed: _canUpdatePassword() && !_isLoading ? _handleUpdatePassword : null,
+        onPressed: _canUpdatePassword() && !_isLoading
+            ? _handleUpdatePassword
+            : null,
         isLoading: _isLoading,
         width: double.infinity,
         backgroundColor: Colors.white,
@@ -351,22 +351,23 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.2),
+          gradient: LinearGradient(
+            colors: [
+              AppColors.primaryGreen.withValues(alpha: 0.3),
+              Colors.green,
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomRight,
           ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.security,
-                  color: Colors.white,
-                  size: 20,
-                ),
+                Icon(Icons.security, color: Colors.white, size: 20),
                 const SizedBox(width: 8),
                 Text(
                   'Security Tips',
@@ -378,9 +379,13 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            _buildSecurityTip('Use a unique password that you don\'t use elsewhere'),
+            _buildSecurityTip(
+              'Use a unique password that you don\'t use elsewhere',
+            ),
             _buildSecurityTip('Consider using a password manager'),
-            _buildSecurityTip('Enable two-factor authentication when available'),
+            _buildSecurityTip(
+              'Enable two-factor authentication when available',
+            ),
             _buildSecurityTip('Don\'t share your password with anyone'),
           ],
         ),
@@ -509,7 +514,12 @@ class _NewPasswordScreenState extends ConsumerState<NewPasswordScreen> {
     try {
       final authMethods = ref.read(authMethodsProvider);
 
-      // Reset password using phone verification
+      PhoneAuthCredential phoneAuthCredential = PhoneAuthProvider.credential(
+        verificationId: widget.verificationId!,
+        smsCode: widget.verifiedOtp,
+      );
+      await FirebaseAuth.instance.signOut();
+      await FirebaseAuth.instance.signInWithCredential(phoneAuthCredential);
       await authMethods.resetPasswordWithPhone(
         widget.phoneNumber,
         _newPasswordController.text.trim(),

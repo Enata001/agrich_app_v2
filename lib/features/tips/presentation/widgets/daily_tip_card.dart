@@ -62,7 +62,10 @@ class _DailyTipCardState extends ConsumerState<DailyTipCard>
     final title = tip['title'] as String? ?? 'Daily Farming Tip';
     final content = tip['content'] as String? ?? 'No tip available today';
     final category = tip['category'] as String? ?? 'general';
-    final createdAt = DateTime.parse(tip['createdAt']);
+    final createdAtRaw = tip['createdAt'];
+    final createdAt = createdAtRaw is String
+        ? DateTime.parse(createdAtRaw)
+        : createdAtRaw as DateTime;
 
     return GestureDetector(
       onTap: widget.onTap ?? () => _handleTap(context, tip),
@@ -74,7 +77,7 @@ class _DailyTipCardState extends ConsumerState<DailyTipCard>
         child: Container(
           width: double.infinity,
           constraints: const BoxConstraints(
-            maxHeight: 180, // Limit the height to prevent overflow
+            maxHeight: 180,
           ),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
