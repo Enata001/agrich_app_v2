@@ -123,7 +123,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
         border: Border.all(color: AppColors.primaryGreen, width: 2),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryGreen.withOpacity(0.2),
+            color: AppColors.primaryGreen.withValues(alpha:0.2),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -133,7 +133,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
 
     final submittedPinTheme = defaultPinTheme.copyWith(
       decoration: defaultPinTheme.decoration!.copyWith(
-        color: AppColors.primaryGreen.withOpacity(0.1),
+        color: AppColors.primaryGreen.withValues(alpha:0.1),
         border: Border.all(color: AppColors.primaryGreen, width: 2),
       ),
     );
@@ -193,7 +193,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha:0.2),
               borderRadius: BorderRadius.circular(40),
             ),
             child: const Icon(Icons.sms, size: 40, color: Colors.white),
@@ -211,7 +211,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
             textAlign: TextAlign.center,
             text: TextSpan(
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha:0.8),
               ),
               children: [
                 const TextSpan(text: 'Enter the 6-digit code sent to\n'),
@@ -280,7 +280,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
           Text(
             "Didn't receive the code?",
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha:0.7),
             ),
           ),
           const SizedBox(height: 8),
@@ -289,7 +289,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
               onPressed: _resendOtp,
               style: TextButton.styleFrom(
                 foregroundColor: Colors.white,
-                backgroundColor: Colors.white.withOpacity(0.2),
+                backgroundColor: Colors.white.withValues(alpha:0.2),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
                   vertical: 12,
@@ -306,7 +306,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
                     Text(
                       'Resend in ',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withOpacity(0.7),
+                        color: Colors.white.withValues(alpha:0.7),
                       ),
                     ),
                     Container(
@@ -315,7 +315,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha:0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -333,7 +333,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
                   width: 200,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha:0.2),
                     borderRadius: BorderRadius.circular(2),
                   ),
                   child: AnimatedBuilder(
@@ -366,14 +366,14 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha:0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
             Icon(
               Icons.info_outline,
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha:0.7),
               size: 20,
             ),
             const SizedBox(width: 12),
@@ -381,7 +381,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
               child: Text(
                 'Make sure to check your messages and enter the 6-digit code we sent.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha:0.7),
                 ),
               ),
             ),
@@ -398,9 +398,9 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.red.withOpacity(0.2),
+          color: Colors.red.withValues(alpha:0.2),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.red.withOpacity(0.3)),
+          border: Border.all(color: Colors.red.withValues(alpha:0.3)),
         ),
         child: Column(
           children: [
@@ -423,7 +423,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
             Text(
               'Phone verification is mandatory to complete your account setup. Skipping this step will result in account deletion.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withValues(alpha:0.9),
               ),
             ),
           ],

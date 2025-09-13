@@ -9,6 +9,7 @@ import '../../../core/providers/app_providers.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../main/presentation/main_screen.dart';
 import '../../shared/widgets/gradient_background.dart';
 import '../../shared/widgets/loading_indicator.dart';
 import '../../shared/widgets/custom_button.dart';
@@ -818,6 +819,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
               final authRepository = ref.read(authRepositoryProvider);
               await authRepository.signOut();
+              ref.read(mainScreenIndexProvider.notifier).state = 0;
 
               if (mounted) {
                 context.go(AppRoutes.auth);

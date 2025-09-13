@@ -185,7 +185,7 @@ class _VideoThumbnailCardState extends State<VideoThumbnailCard>
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.7),
+                color: Colors.black.withValues(alpha:0.7),
                 borderRadius: BorderRadius.circular(28),
               ),
               child: const Icon(
@@ -206,7 +206,7 @@ class _VideoThumbnailCardState extends State<VideoThumbnailCard>
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.8),
+                    color: Colors.black.withValues(alpha:0.8),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(

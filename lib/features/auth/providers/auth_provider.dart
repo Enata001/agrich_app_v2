@@ -2,6 +2,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import '../../../core/providers/app_providers.dart';
 import '../data/models/user_model.dart';
 import '../data/repositories/auth_repository.dart';

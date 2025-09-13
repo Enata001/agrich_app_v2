@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/services/connectivity_service.dart';
 import '../../../../core/services/network_service.dart' hide networkServiceProvider;

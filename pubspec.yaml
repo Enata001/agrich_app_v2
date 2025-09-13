@@ -18,7 +18,7 @@ dependencies:
   smooth_page_indicator: ^1.1.0
   flutter_staggered_animations: ^1.1.1
   go_router: ^16.2.1
-  flutter_riverpod: ^2.4.9
+  flutter_riverpod: ^3.0.0
   firebase_core: ^4.1.0
   firebase_auth: ^6.0.2
   firebase_database: ^12.0.1
@@ -44,12 +44,16 @@ dependencies:
   weather: ^3.1.1
   timeago: ^3.7.1
   flutter_launcher_icons: ^0.14.4
-  share_plus: ^11.1.0
+  share_plus: ^12.0.0
   mask_text_input_formatter: ^2.9.0
   flutter_dotenv: ^6.0.0
   youtube_player_flutter: ^9.1.2
   validators: ^3.0.0
-  connectivity_plus: ^6.1.5
+  connectivity_plus: ^7.0.0
+  fl_chart: ^1.1.0
+
+dependency_overrides:
+  vector_math: ^2.2.0
 
 dev_dependencies:
   flutter_test:

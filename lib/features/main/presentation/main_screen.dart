@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
+import '../../../core/config/app_config.dart';
+import '../../admin/presentation/screens/admin_main_screen.dart';
+import '../../admin/providers/admin_providers.dart';
 import '../../home/presentation/home_screen.dart';
 import '../../community/presentation/community_screen.dart';
 import '../../shared/widgets/custom_navigation_bar.dart';
@@ -89,6 +93,10 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final currentIndex = ref.watch(mainScreenIndexProvider);
+    final userType = ref.watch(userTypeProvider);
+    if (userType == UserType.admin) {
+      return const AdminMainScreen();
+    }
 
     return Scaffold(
       extendBody: true,

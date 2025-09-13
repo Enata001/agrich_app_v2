@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/app_providers.dart';
 import 'core/router/app_routes.dart';
+import 'core/services/util_service.dart';
 import 'features/shared/widgets/loading_indicator.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -54,29 +55,31 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       _textController.forward();
     });
   }
+  Future<void> setupAdmins() async {
+    final uploader = AdminDataUploader();
 
+    await uploader.uploadAdminData(
+      superAdminUid: 'TcDKlYVYM5eaOJj60lqY0qG20AV2',
+      adminUid: 'uTUp5SdtnoRbNxLiuIGJzjaG3fy2',
+      moderatorUid: 'LAfCSXRijIYoZAiSWXGoL7EDiZC2',
+    );
+
+    print('Admin setup complete!');
+  }
   Future<void> _initializeApp() async {
     try {
 
-      await Future.delayed(const Duration(seconds: 3));
+      // await setupAdmins();
 
-
+      await Future.delayed(const Duration(seconds: 1));
       await ref.read(sharedPreferencesInitProvider.future);
-
-
       final localStorage = ref.read(localStorageServiceProvider);
       final authRepository = ref.read(authRepositoryProvider);
-
-
       final hasOnboarded = localStorage.isOnboardingComplete();
-
       if (!hasOnboarded) {
-
         if (mounted) context.go(AppRoutes.onboarding);
         return;
       }
-
-
       final isSignedIn = authRepository.isSignedIn;
       final currentUser = authRepository.currentUser;
 

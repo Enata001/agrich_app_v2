@@ -3,6 +3,7 @@
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/services/connectivity_service.dart';
 import '../../data/repositories/profile_repository.dart';

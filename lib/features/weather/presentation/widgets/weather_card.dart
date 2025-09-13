@@ -81,7 +81,7 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
           ),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: Colors.white.withOpacity(0.5),
+            color: Colors.white.withValues(alpha:0.5),
             width: 1,
           ),
         ),
@@ -93,7 +93,7 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
               children: [
                 Icon(
                   Icons.wb_sunny,
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha:0.9),
                   size: 20,
                 ),
                 const SizedBox(width: 8),
@@ -109,7 +109,7 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
                 if (!isOnline)
                   Icon(
                     Icons.offline_bolt,
-                    color: Colors.orange.withOpacity(0.8),
+                    color: Colors.orange.withValues(alpha:0.8),
                     size: 16,
                   ),
                 const SizedBox(width: 8),
@@ -119,7 +119,7 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha:0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: _isRequestingLocation
@@ -133,7 +133,7 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
                     )
                         : Icon(
                       Icons.my_location,
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha:0.9),
                       size: 16,
                     ),
                   ),
@@ -163,7 +163,7 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
                       Text(
                         description.toUpperCase(),
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha:0.8),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -183,7 +183,7 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
                           return Icon(
                             Icons.wb_sunny,
                             size: 80,
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha:0.8),
                           );
                         },
                       ),
@@ -235,14 +235,14 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
               data: (advice) => Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
+                  color: Colors.white.withValues(alpha:0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   children: [
                     Icon(
                       Icons.lightbulb_outline,
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha:0.8),
                       size: 16,
                     ),
                     const SizedBox(width: 8),
@@ -250,7 +250,7 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
                       child: Text(
                         advice,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha:0.9),
                         ),
                       ),
                     ),
@@ -272,7 +272,7 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
                   'Tap for detailed forecast →',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha:0.7),
                     fontStyle: FontStyle.italic,
                   ),
                 ),
@@ -376,7 +376,7 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
       children: [
         Icon(
           icon,
-          color: Colors.white.withOpacity(0.8),
+          color: Colors.white.withValues(alpha:0.8),
           size: 16,
         ),
         const SizedBox(height: 4),
@@ -390,7 +390,7 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
         Text(
           label,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Colors.white.withOpacity(0.7),
+            color: Colors.white.withValues(alpha:0.7),
             fontSize: 10,
           ),
         ),
@@ -402,14 +402,14 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: Colors.white.withValues(alpha:0.15),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
           Icon(
             Icons.lightbulb_outline,
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withValues(alpha:0.8),
             size: 16,
           ),
           const SizedBox(width: 8),
@@ -417,7 +417,7 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
             child: Container(
               height: 14,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withValues(alpha:0.3),
                 borderRadius: BorderRadius.circular(7),
               ),
             ),
@@ -437,15 +437,15 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Colors.white.withOpacity(0.25),
-              Colors.white.withOpacity(0.15),
+              Colors.white.withValues(alpha:0.25),
+              Colors.white.withValues(alpha:0.15),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: Colors.white.withOpacity(0.3),
+            color: Colors.white.withValues(alpha:0.3),
             width: 1,
           ),
         ),
@@ -480,15 +480,15 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Colors.red.withOpacity(0.3),
-              Colors.red.withOpacity(0.2),
+              Colors.red.withValues(alpha:0.3),
+              Colors.red.withValues(alpha:0.2),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: Colors.red.withOpacity(0.3),
+            color: Colors.red.withValues(alpha:0.3),
             width: 1,
           ),
         ),
@@ -515,7 +515,7 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
             Text(
               'Unable to get weather data. Using default location (Accra).',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withValues(alpha:0.9),
               ),
             ),
             const SizedBox(height: 16),
@@ -524,7 +524,7 @@ class _WeatherCardState extends ConsumerState<WeatherCard> {
               icon: const Icon(Icons.refresh),
               label: const Text('Try Again'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white.withOpacity(0.2),
+                backgroundColor: Colors.white.withValues(alpha:0.2),
                 foregroundColor: Colors.white,
               ),
             ),

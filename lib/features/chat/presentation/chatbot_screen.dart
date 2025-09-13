@@ -76,7 +76,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha:0.2),
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Icon(
@@ -100,7 +100,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
               Text(
                 'AI Farming Assistant',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha:0.8),
                   fontSize: 12,
                 ),
               ),
@@ -155,7 +155,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
               width: 120,
               height: 120,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha:0.2),
                 borderRadius: BorderRadius.circular(60),
               ),
               child: const Icon(
@@ -184,7 +184,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
             child: Text(
               'I\'m your AI farming assistant. Ask me anything about agriculture, crops, soil, weather, or farming techniques!',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withValues(alpha:0.9),
                 fontSize: 16,
                 height: 1.5,
               ),
@@ -198,7 +198,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
             child: Text(
               'Try asking:',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha:0.8),
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
@@ -217,10 +217,10 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
+                        color: Colors.white.withValues(alpha:0.15),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
+                          color: Colors.white.withValues(alpha:0.3),
                           width: 1,
                         ),
                       ),
@@ -259,7 +259,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha:0.2),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: const Icon(
@@ -279,7 +279,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
                   decoration: BoxDecoration(
                     color: isUser
                         ? AppColors.primaryGreen
-                        : Colors.white.withOpacity(0.9),
+                        : Colors.white.withValues(alpha:0.9),
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(16),
                       topRight: const Radius.circular(16),
@@ -288,7 +288,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha:0.1),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -308,7 +308,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
                 const SizedBox(width: 8),
                 CircleAvatar(
                   radius: 16,
-                  backgroundColor: Colors.white.withOpacity(0.2),
+                  backgroundColor: Colors.white.withValues(alpha:0.2),
                   child: const Icon(
                     Icons.person,
                     color: Colors.white,
@@ -327,7 +327,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
             child: Text(
               timestamp,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha:0.6),
                 fontSize: 12,
               ),
             ),
@@ -346,7 +346,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha:0.2),
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Icon(
@@ -359,7 +359,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha:0.9),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(16),
                 topRight: Radius.circular(16),
@@ -381,7 +381,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withValues(alpha:0.1),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
@@ -407,7 +407,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
                 height: 48,
                 decoration: BoxDecoration(
                   color: state.isLoading
-                      ? Colors.grey.withOpacity(0.5)
+                      ? Colors.grey.withValues(alpha:0.5)
                       : AppColors.primaryGreen,
                   borderRadius: BorderRadius.circular(24),
                 ),
