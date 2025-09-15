@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/admin/presentation/screens/admin_tip_form_screen.dart';
+import '../../features/admin/presentation/screens/admin_video_form_screen.dart';
 import '../../features/auth/presentation/new_password_screen.dart';
 import '../../features/auth/presentation/phone_sign_in_screen.dart';
 import '../../features/chat/presentation/chatbot_screen.dart';
@@ -281,8 +283,57 @@ class AppRouter {
           transitionsBuilder: RouteTransitions.slidePullBackTransition,
         ),
       ),
-    ],
+    GoRoute(
+      path: '/admin/tip/create',
+      name: 'admin-tip-create',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return AdminTipFormScreen(
+          tip: null,
+          onSave: extra?['onSave'] ?? (tip) async {},
+        );
+      },
+    ),
 
+    GoRoute(
+      path: '/admin/tip/edit',
+      name: 'admin-tip-edit',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final tip = extra?['tip'] as Map<String, dynamic>?;
+        return AdminTipFormScreen(
+          tip: tip,
+          onSave: extra?['onSave'] ?? (tip) async {},
+        );
+      },
+    ),
+
+    // Video form routes
+    GoRoute(
+      path: '/admin/video/create',
+      name: 'admin-video-create',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return AdminVideoFormScreen(
+          video: null,
+          onSave: extra?['onSave'] ?? (video) async {},
+        );
+      },
+    ),
+
+    GoRoute(
+      path: '/admin/video/edit',
+      name: 'admin-video-edit',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final video = extra?['video'] as Map<String, dynamic>?;
+        return AdminVideoFormScreen(
+          video: video,
+          onSave: extra?['onSave'] ?? (video) async {},
+        );
+      },
+    ),
+    ],
     errorBuilder: (context, state) => Scaffold(
       body: Center(
         child: Column(

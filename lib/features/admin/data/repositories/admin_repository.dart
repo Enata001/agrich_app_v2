@@ -186,13 +186,12 @@ class AdminRepository {
     // Apply filters
     switch (filter) {
       case UserFilterType.active:
-        query = query.where('isActive', isEqualTo: true).where('isSuspended', isEqualTo: false);
         break;
       case UserFilterType.suspended:
         query = query.where('isSuspended', isEqualTo: true);
         break;
       case UserFilterType.unverified:
-        query = query.where('isEmailVerified', isEqualTo: false);
+        query = query.where('isPhoneVerified', isEqualTo: false);
         break;
       case UserFilterType.all:
       break;

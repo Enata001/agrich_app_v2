@@ -280,14 +280,27 @@ class AdminUserView {
   });
 
   factory AdminUserView.fromMap(Map<String, dynamic> map) {
+    map[''] is Timestamp
+        ? map[''].toDate()
+        : map[''] is String
+        ? DateTime.tryParse(map['']) ?? DateTime.now()
+        : DateTime.now();
     return AdminUserView(
       id: map['id'] ?? '',
       username: map['username'] ?? '',
       email: map['email'] ?? '',
       phoneNumber: map['phoneNumber'],
       location: map['location'],
-      joinedAt: (map['joinedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      lastActiveAt: (map['lastActiveAt'] as Timestamp?)?.toDate(),
+      joinedAt: map['joinedAt'] is Timestamp
+          ? map['joinedAt'].toDate()
+          : map['joinedAt'] is String
+          ? DateTime.tryParse(map['joinedAt']) ?? DateTime.now()
+          : DateTime.now(),
+      lastActiveAt: map['lastActiveAt'] is Timestamp
+          ? map['lastActiveAt'].toDate()
+          : map['lastActiveAt'] is String
+          ? DateTime.tryParse(map['lastActiveAt']) ?? DateTime.now()
+          : DateTime.now(),
       isEmailVerified: map['isEmailVerified'] ?? false,
       isPhoneVerified: map['isPhoneVerified'] ?? false,
       isActive: map['isActive'] ?? true,
@@ -297,7 +310,11 @@ class AdminUserView {
       likesReceived: map['likesReceived'] ?? 0,
       profilePictureUrl: map['profilePictureUrl'],
       suspensionReason: map['suspensionReason'],
-      suspendedAt: (map['suspendedAt'] as Timestamp?)?.toDate(),
+      suspendedAt: map['suspendedAt'] is Timestamp
+          ? map['suspendedAt'].toDate()
+          : map['suspendedAt'] is String
+          ? DateTime.tryParse(map['suspendedAt']) ?? DateTime.now()
+          : DateTime.now(),
     );
   }
 }

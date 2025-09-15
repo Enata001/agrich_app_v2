@@ -90,7 +90,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen>
         children: [
           const Text(
             'User Management',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
           ),
           Text(
             '$userCount users',
@@ -109,12 +109,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen>
           tooltip: 'Refresh',
         ),
         // Export button
-        IconButton(
-          onPressed: _showExportOptions,
-          icon: const Icon(Icons.download),
-          tooltip: 'Export',
-        ),
-        const SizedBox(width: 8),
+
       ],
     );
   }
@@ -216,7 +211,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen>
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => _showUserDetails(user),
+          onTap: () => showAdminUserDetailsBottomSheet(context, user: user),
           borderRadius: BorderRadius.circular(16),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -394,140 +389,167 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen>
         final user = users[index];
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha:0.1),
+                color: Colors.black.withOpacity(0.1),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
             ],
             border: user.isSuspended
-                ? Border.all(color: Colors.red.withValues(alpha:0.3))
+                ? Border.all(color: Colors.red.withOpacity(0.3))
                 : null,
           ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            leading: Stack(
-              children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: AppColors.primaryGreen.withValues(alpha:0.1),
-                  backgroundImage: user.profilePictureUrl?.isNotEmpty == true
-                      ? CachedNetworkImageProvider(user.profilePictureUrl!)
-                      : null,
-                  child: user.profilePictureUrl?.isEmpty != false
-                      ? Text(
-                    user.username.isNotEmpty ? user.username[0].toUpperCase() : 'U',
-                    style: TextStyle(
-                      color: AppColors.primaryGreen,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
-                      : null,
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: _getUserStatusColor(user),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            title: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    user.username,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (user.isSuspended)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Text(
-                      'SUSPENDED',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(user.email, style: TextStyle(color: Colors.grey[600])),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      '${user.postsCount} posts • ${user.likesReceived} likes',
-                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'Joined ${timeago.format(user.joinedAt)}',
-                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            trailing: PopupMenuButton<String>(
-              onSelected: (value) => _handleUserAction(value, user),
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'details',
-                  child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Row: Avatar + Username + Status + Menu
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Avatar with status dot
+                  Stack(
                     children: [
-                      Icon(Icons.visibility, size: 20),
-                      SizedBox(width: 8),
-                      Text('View Details'),
+                      CircleAvatar(
+                        radius: 24,
+                        backgroundColor: AppColors.primaryGreen.withOpacity(0.1),
+                        backgroundImage: user.profilePictureUrl?.isNotEmpty == true
+                            ? CachedNetworkImageProvider(user.profilePictureUrl!)
+                            : null,
+                        child: user.profilePictureUrl?.isEmpty != false
+                            ? Text(
+                          user.username.isNotEmpty
+                              ? user.username[0].toUpperCase()
+                              : 'U',
+                          style: TextStyle(
+                            color: AppColors.primaryGreen,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                            : null,
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: _getUserStatusColor(user),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 1),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-                ),
-                if (!user.isSuspended)
-                  const PopupMenuItem(
-                    value: 'suspend',
-                    child: Row(
+                  const SizedBox(width: 12),
+
+                  // Username + Status
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.block, size: 20, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Suspend', style: TextStyle(color: Colors.red)),
+                        Text(
+                          user.username,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (user.isSuspended)
+                          Container(
+                            margin: const EdgeInsets.only(top: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text(
+                              'SUSPENDED',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
-                if (user.isSuspended)
-                  const PopupMenuItem(
-                    value: 'activate',
-                    child: Row(
-                      children: [
-                        Icon(Icons.check_circle, size: 20, color: Colors.green),
-                        SizedBox(width: 8),
-                        Text('Activate', style: TextStyle(color: Colors.green)),
-                      ],
-                    ),
+
+                  // Popup Menu
+                  PopupMenuButton<String>(
+                    onSelected: (value) => _handleUserAction(value, user),
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'details',
+                        child: Row(
+                          children: [
+                            Icon(Icons.visibility, size: 20),
+                            SizedBox(width: 8),
+                            Text('View Details'),
+                          ],
+                        ),
+                      ),
+                      if (!user.isSuspended)
+                        const PopupMenuItem(
+                          value: 'suspend',
+                          child: Row(
+                            children: [
+                              Icon(Icons.block, size: 20, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Suspend', style: TextStyle(color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                      if (user.isSuspended)
+                        const PopupMenuItem(
+                          value: 'activate',
+                          child: Row(
+                            children: [
+                              Icon(Icons.check_circle, size: 20, color: Colors.green),
+                              SizedBox(width: 8),
+                              Text('Activate', style: TextStyle(color: Colors.green)),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
-              ],
-            ),
-            onTap: () => _showUserDetails(user),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              // Email
+              Text(
+                user.email,
+                style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                overflow: TextOverflow.ellipsis,
+              ),
+
+              const SizedBox(height: 6),
+
+              // Stats Row
+              Row(
+                children: [
+                  Text(
+                    '${user.postsCount} posts • ${user.likesReceived} likes',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                  ),
+                  const Spacer(),
+                  Text(
+                    'Joined ${timeago.format(user.joinedAt)}',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                  ),
+                ],
+              ),
+            ],
           ),
         );
       },
@@ -614,7 +636,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen>
 
   Color _getUserStatusColor(AdminUserView user) {
     if (user.isSuspended) return Colors.red;
-    if (!user.isEmailVerified) return Colors.orange;
+    if (!user.isPhoneVerified) return Colors.orange;
     if (user.lastActiveAt != null &&
         DateTime.now().difference(user.lastActiveAt!).inDays < 7) {
       return Colors.green;
@@ -625,7 +647,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen>
   void _handleUserAction(String action, AdminUserView user) {
     switch (action) {
       case 'details':
-        _showUserDetails(user);
+        showAdminUserDetailsBottomSheet(context,user: user);
         break;
       case 'suspend':
         _showSuspendDialog(user);
@@ -639,10 +661,16 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen>
     }
   }
 
-  void _showUserDetails(AdminUserView user) {
-    showDialog(
+
+  void showAdminUserDetailsBottomSheet(
+      BuildContext context, {
+        required AdminUserView user,
+      }) {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AdminUserDetailsDialog(user: user),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => AdminUserDetailsBottomSheet(user: user),
     );
   }
 

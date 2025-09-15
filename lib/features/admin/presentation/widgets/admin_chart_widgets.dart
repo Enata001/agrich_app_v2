@@ -1,53 +1,89 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 
+import '../../../../core/theme/app_colors.dart';
+
 class AdminChartCard extends StatelessWidget {
   final String title;
   final Widget child;
-  final double height;
+  final String? subtitle;
+  final IconData? icon;
 
   const AdminChartCard({
     super.key,
     required this.title,
     required this.child,
-    this.height = 300,
+    this.subtitle,
+    this.icon,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: height,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
-            offset: const Offset(0, 4),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
+          // Header
+          Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, color: AppColors.primaryGreen, size: 20),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 20),
-          Expanded(child: child),
+
+          if (subtitle != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              subtitle!,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+
+          const SizedBox(height: 16),
+
+          // Chart content with constrained height to prevent overflow
+          ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxHeight: 300, // Prevent charts from becoming too tall
+              minHeight: 200,
+            ),
+            child: child,
+          ),
         ],
       ),
     );
   }
 }
-
 class AdminUserGrowthChart extends StatelessWidget {
   final int newUsersToday;
   final int newUsersWeek;

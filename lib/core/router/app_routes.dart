@@ -17,4 +17,8 @@ class AppRoutes {
   static const String newPassword = '/new-password';
   static const String weatherDetails = '/weather-details';
   static const String chatbot = '/chatbot';
+  static const String adminTipCreate = '/admin/tip/create';
+  static const String adminTipEdit = '/admin/tip/edit';
+  static const String adminVideoCreate = '/admin/video/create';
+  static const String adminVideoEdit = '/admin/video/edit';
 }

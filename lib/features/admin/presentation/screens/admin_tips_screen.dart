@@ -1,3 +1,5 @@
+import 'package:agrich_app_v2/core/router/app_router.dart';
+import 'package:agrich_app_v2/core/router/app_routes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -103,7 +105,8 @@ class _AdminTipsScreenState extends ConsumerState<AdminTipsScreen>
         children: [
           const Text(
             'Tips Management',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+
           ),
           Text(
             '$tipCount tips',
@@ -122,42 +125,7 @@ class _AdminTipsScreenState extends ConsumerState<AdminTipsScreen>
           tooltip: 'Refresh',
         ),
         // Import/Export menu
-        PopupMenuButton<String>(
-          onSelected: _handleMenuAction,
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'import',
-              child: Row(
-                children: [
-                  Icon(Icons.upload, size: 20),
-                  SizedBox(width: 8),
-                  Text('Import Tips'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'export',
-              child: Row(
-                children: [
-                  Icon(Icons.download, size: 20),
-                  SizedBox(width: 8),
-                  Text('Export Tips'),
-                ],
-              ),
-            ),
-             PopupMenuItem(
-              value: 'template',
-              child: Row(
-                children: [
-                  Icon(Icons.article_sharp, size: 20),
-                  SizedBox(width: 8),
-                  Text('Download Template'),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(width: 8),
+
       ],
     );
   }
@@ -694,22 +662,30 @@ class _AdminTipsScreenState extends ConsumerState<AdminTipsScreen>
   }
 
   void _showCreateTipDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AdminTipFormDialog(
-        onSave: _createTip,
-      ),
-    );
+    // showDialog(
+    //   context: context,
+    //   builder: (context) => AdminTipFormDialog(
+    //     onSave: _createTip,
+    //   ),
+    // );
+    AppRouter.push(AppRoutes.adminTipCreate, extra: {
+      'onSave': _createTip,
+    });
+
   }
 
   void _showEditTipDialog(BuildContext context, Map<String, dynamic> tip) {
-    showDialog(
-      context: context,
-      builder: (context) => AdminTipFormDialog(
-        tip: tip,
-        onSave: (tipData) => _updateTip(tip['id'], tipData),
-      ),
-    );
+    // showDialog(
+    //   context: context,
+    //   builder: (context) => AdminTipFormDialog(
+    //     tip: tip,
+    //     onSave: (tipData) => _updateTip(tip['id'], tipData),
+    //   ),
+    // );
+    AppRouter.push(AppRoutes.adminTipEdit, extra: {
+      'tip': tip,
+      'onSave': (tipData) => _updateTip(tip['id'], tipData),
+    });
   }
 
   Future<void> _createTip(Map<String, dynamic> tipData) async {

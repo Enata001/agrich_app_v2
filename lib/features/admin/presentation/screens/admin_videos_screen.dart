@@ -1,9 +1,11 @@
+import 'package:agrich_app_v2/core/router/app_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../../../core/config/utils.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../shared/widgets/loading_indicator.dart';
@@ -122,43 +124,6 @@ class _AdminVideosScreenState extends ConsumerState<AdminVideosScreen>
           icon: const Icon(Icons.refresh),
           tooltip: 'Refresh',
         ),
-        // More options
-        PopupMenuButton<String>(
-          onSelected: _handleMenuAction,
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'bulk_upload',
-              child: Row(
-                children: [
-                  Icon(Icons.cloud_upload, size: 20),
-                  SizedBox(width: 8),
-                  Text('Bulk Upload'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'export',
-              child: Row(
-                children: [
-                  Icon(Icons.download, size: 20),
-                  SizedBox(width: 8),
-                  Text('Export List'),
-                ],
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'analytics',
-              child: Row(
-                children: [
-                  Icon(Icons.analytics, size: 20),
-                  SizedBox(width: 8),
-                  Text('View Analytics'),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(width: 8),
       ],
     );
   }
@@ -247,191 +212,157 @@ class _AdminVideosScreenState extends ConsumerState<AdminVideosScreen>
     final likes = video['likes'] ?? 0;
 
     return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
         border: isSelected
             ? Border.all(color: AppColors.primaryGreen, width: 2)
             : null,
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _showEditVideoDialog(context, video),
-          onLongPress: () => ref.read(selectedVideosProvider.notifier).toggle(video['id']),
-          borderRadius: BorderRadius.circular(16),
-          child: Column(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Thumbnail and selection
-              Stack(
+              // Checkbox + Thumbnail
+              Column(
                 children: [
+                  GestureDetector(
+                    onTap: () => ref.read(selectedVideosProvider.notifier).toggle(video['id']),
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.primaryGreen : null,
+                        border: isSelected ? null : Border.all(color: Colors.grey[400]!),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: isSelected
+                          ? const Icon(Icons.check, color: Colors.white, size: 16)
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   Container(
-                    height: 120,
-                    width: double.infinity,
+                    width: 60,
+                    height: 45,
                     decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                      borderRadius: BorderRadius.circular(8),
                       color: Colors.grey[200],
                     ),
                     child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                      child: video['thumbnailUrl']?.isNotEmpty == true
-                          ? CachedNetworkImage(
-                        imageUrl: video['thumbnailUrl'],
-                        fit: BoxFit.cover,
-                        errorWidget: (context, url, error) => Container(
-                          color: Colors.grey[300],
-                          child: const Icon(Icons.video_library, size: 40),
-                        ),
-                      )
-                          : Container(
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.video_library, size: 40),
-                      ),
-                    ),
-                  ),
-
-                  // Play button overlay
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha:0.3),
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.play_arrow,
-                          color: Colors.white,
-                          size: 32,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Duration badge
-                  if (video['duration'] != null)
-                    Positioned(
-                      bottom: 8,
-                      right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha:0.8),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          video['duration'],
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Stack(
+                        children: [
+                          if (video['thumbnailUrl']?.isNotEmpty == true)
+                            CachedNetworkImage(
+                              imageUrl: video['thumbnailUrl'],
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorWidget: (context, url, error) => const Icon(Icons.video_library),
+                            )
+                          else
+                            const Icon(Icons.video_library),
+                          Container(
+                            color: Colors.black.withOpacity(0.3),
+                            child: const Center(
+                              child: Icon(Icons.play_arrow, color: Colors.white, size: 16),
+                            ),
                           ),
-                        ),
-                      ),
-                    ),
-
-                  // Selection indicator
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: GestureDetector(
-                      onTap: () => ref.read(selectedVideosProvider.notifier).toggle(video['id']),
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: isSelected ? AppColors.primaryGreen : Colors.white.withValues(alpha:0.8),
-                          border: isSelected ? null : Border.all(color: Colors.grey[400]!),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: isSelected
-                            ? const Icon(Icons.check, color: Colors.white, size: 16)
-                            : null,
+                        ],
                       ),
                     ),
                   ),
                 ],
               ),
+              const SizedBox(width: 12),
 
-              // Video info
+              // Title and metadata
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Title
-                      Text(
-                        video['title'] ?? 'Untitled',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-
-                      // Category
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryGreen.withValues(alpha:0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          video['category'] ?? 'General',
-                          style: TextStyle(
-                            color: AppColors.primaryGreen,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      video['title'] ?? 'Untitled',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGreen.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            video['category'] ?? 'General',
+                            style: TextStyle(
+                              color: AppColors.primaryGreen,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
-                      const Spacer(),
-
-                      // Stats
-                      Row(
-                        children: [
-                          Icon(Icons.visibility, size: 12, color: Colors.grey[600]),
-                          const SizedBox(width: 4),
+                        if (video['duration'] != null) ...[
+                          const SizedBox(width: 8),
                           Text(
-                            _formatCount(views),
-                            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                          ),
-                          const SizedBox(width: 12),
-                          Icon(Icons.favorite, size: 12, color: Colors.grey[600]),
-                          const SizedBox(width: 4),
-                          Text(
-                            _formatCount(likes),
+                            video['duration'],
                             style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 4),
-
-                      // Date
-                      Text(
-                        timeago.format(createdAt),
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.grey[500],
-                        ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.visibility, size: 12, color: Colors.grey[500]),
+                        const SizedBox(width: 4),
+                        Text('${_formatCount(views)} views',
+                            style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                        const SizedBox(width: 12),
+                        Icon(Icons.favorite, size: 12, color: Colors.grey[500]),
+                        const SizedBox(width: 4),
+                        Text('${_formatCount(likes)} likes',
+                            style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                        const Spacer(),
+                        Text(timeago.format(createdAt),
+                            style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                      ],
+                    ),
+                  ],
                 ),
+              ),
+
+              // Menu
+              PopupMenuButton<String>(
+                onSelected: (value) => _handleVideoAction(value, video),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                  const PopupMenuItem(value: 'preview', child: Text('Preview')),
+                  const PopupMenuItem(value: 'analytics', child: Text('Analytics')),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Text('Delete', style: TextStyle(color: Colors.red)),
+                  ),
+                ],
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -450,12 +381,13 @@ class _AdminVideosScreenState extends ConsumerState<AdminVideosScreen>
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha:0.1),
+                color: Colors.black.withOpacity(0.1),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -464,179 +396,136 @@ class _AdminVideosScreenState extends ConsumerState<AdminVideosScreen>
                 ? Border.all(color: AppColors.primaryGreen, width: 2)
                 : null,
           ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(12),
-            leading: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Selection checkbox
-                GestureDetector(
-                  onTap: () => ref.read(selectedVideosProvider.notifier).toggle(video['id']),
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: isSelected ? AppColors.primaryGreen : null,
-                      border: isSelected ? null : Border.all(color: Colors.grey[400]!),
-                      borderRadius: BorderRadius.circular(6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left: Checkbox + Thumbnail
+              Column(
+                children: [
+                  GestureDetector(
+                    onTap: () => ref.read(selectedVideosProvider.notifier).toggle(video['id']),
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.primaryGreen : null,
+                        border: isSelected ? null : Border.all(color: Colors.grey[400]!),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: isSelected
+                          ? const Icon(Icons.check, color: Colors.white, size: 16)
+                          : null,
                     ),
-                    child: isSelected
-                        ? const Icon(Icons.check, color: Colors.white, size: 16)
-                        : null,
                   ),
-                ),
-                const SizedBox(width: 12),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 60,
+                    height: 45,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.grey[200],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Stack(
+                        children: [
+                          if (video['thumbnailUrl']?.isNotEmpty == true)
+                            CachedNetworkImage(
+                              imageUrl: video['thumbnailUrl'],
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorWidget: (context, url, error) => const Icon(Icons.video_library),
+                            )
+                          else
+                            const Icon(Icons.video_library),
+                          Container(
+                            color: Colors.black.withOpacity(0.3),
+                            child: const Center(
+                              child: Icon(Icons.play_arrow, color: Colors.white, size: 16),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 12),
 
-                // Thumbnail
-                Container(
-                  width: 60,
-                  height: 45,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    color: Colors.grey[200],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Stack(
+              // Middle: Title + Metadata
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      video['title'] ?? 'Untitled',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
                       children: [
-                        if (video['thumbnailUrl']?.isNotEmpty == true)
-                          CachedNetworkImage(
-                            imageUrl: video['thumbnailUrl'],
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                            errorWidget: (context, url, error) => const Icon(Icons.video_library),
-                          )
-                        else
-                          const Icon(Icons.video_library),
-
-                        // Play overlay
                         Container(
-                          color: Colors.black.withValues(alpha:0.3),
-                          child: const Center(
-                            child: Icon(
-                              Icons.play_arrow,
-                              color: Colors.white,
-                              size: 16,
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryGreen.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            video['category'] ?? 'General',
+                            style: TextStyle(
+                              color: AppColors.primaryGreen,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
+                        if (video['duration'] != null) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            video['duration'],
+                            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                          ),
+                        ],
                       ],
                     ),
-                  ),
-                ),
-              ],
-            ),
-            title: Text(
-              video['title'] ?? 'Untitled',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryGreen.withValues(alpha:0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        video['category'] ?? 'General',
-                        style: TextStyle(
-                          color: AppColors.primaryGreen,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    if (video['duration'] != null) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        video['duration'],
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.visibility, size: 12, color: Colors.grey[500]),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${_formatCount(views)} views',
-                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                    ),
-                    const SizedBox(width: 12),
-                    Icon(Icons.favorite, size: 12, color: Colors.grey[500]),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${_formatCount(likes)} likes',
-                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                    ),
-                    const Spacer(),
-                    Text(
-                      timeago.format(createdAt),
-                      style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.visibility, size: 12, color: Colors.grey[500]),
+                        const SizedBox(width: 4),
+                        Text('${_formatCount(views)} views',
+                            style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                        const SizedBox(width: 12),
+                        Icon(Icons.favorite, size: 12, color: Colors.grey[500]),
+                        const SizedBox(width: 4),
+                        Text('${_formatCount(likes)} likes',
+                            style: TextStyle(fontSize: 11, color: Colors.grey[500])),
+                        const Spacer(),
+                        Text(timeago.format(createdAt),
+                            style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-            trailing: PopupMenuButton<String>(
-              onSelected: (value) => _handleVideoAction(value, video),
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 20),
-                      SizedBox(width: 8),
-                      Text('Edit'),
-                    ],
+              ),
+
+              // Right: Popup Menu
+              PopupMenuButton<String>(
+                onSelected: (value) => _handleVideoAction(value, video),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                  const PopupMenuItem(value: 'preview', child: Text('Preview')),
+                  const PopupMenuItem(value: 'analytics', child: Text('Analytics')),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Text('Delete', style: TextStyle(color: Colors.red)),
                   ),
-                ),
-                const PopupMenuItem(
-                  value: 'preview',
-                  child: Row(
-                    children: [
-                      Icon(Icons.play_arrow, size: 20),
-                      SizedBox(width: 8),
-                      Text('Preview'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'analytics',
-                  child: Row(
-                    children: [
-                      Icon(Icons.analytics, size: 20),
-                      SizedBox(width: 8),
-                      Text('Analytics'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, size: 20, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Delete', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            onTap: () => _showEditVideoDialog(context, video),
+                ],
+              ),
+            ],
           ),
         );
       },
@@ -761,22 +650,16 @@ class _AdminVideosScreenState extends ConsumerState<AdminVideosScreen>
   }
 
   void _showCreateVideoDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AdminVideoFormDialog(
-        onSave: _createVideo,
-      ),
-    );
+    AppRouter.push(AppRoutes.adminVideoCreate, extra: {
+      'onSave': _createVideo
+    });
   }
 
   void _showEditVideoDialog(BuildContext context, Map<String, dynamic> video) {
-    showDialog(
-      context: context,
-      builder: (context) => AdminVideoFormDialog(
-        video: video,
-        onSave: (videoData) => _updateVideo(video['id'], videoData),
-      ),
-    );
+        AppRouter.push(AppRoutes.adminVideoEdit, extra: {
+          'video': video,
+          'onSave': (videoData) => _updateVideo(video['id'], videoData),
+        });
   }
 
   void _createVideo(Map<String, dynamic> videoData) async {
