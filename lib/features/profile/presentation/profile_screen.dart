@@ -1,3 +1,4 @@
+import 'package:agrich_app_v2/core/router/app_router.dart';
 import 'package:agrich_app_v2/features/auth/data/models/user_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -818,12 +819,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               Navigator.pop(context); // Close bottom sheet
 
               final authRepository = ref.read(authRepositoryProvider);
-              await authRepository.signOut();
               ref.read(mainScreenIndexProvider.notifier).state = 0;
+              await authRepository.signOut();
 
-              if (mounted) {
-                context.go(AppRoutes.auth);
-              }
+
+                AppRouter.go(AppRoutes.auth);
+
             },
             child: const Text('Sign Out', style: TextStyle(color: Colors.red)),
           ),

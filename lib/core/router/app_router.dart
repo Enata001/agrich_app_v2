@@ -29,6 +29,9 @@ class AppRouter {
   static void push(String location, {dynamic extra}) {
     _rootNavigatorKey.currentContext?.push(location, extra: extra);
   }
+  static void go(String location, {dynamic extra}) {
+    _rootNavigatorKey.currentContext?.go(location, extra: extra);
+  }
 
   static GoRouter get router => GoRouter(
     navigatorKey: _rootNavigatorKey,
