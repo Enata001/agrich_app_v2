@@ -609,6 +609,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
     String phoneNumber, {
     required bool isSignUp,
   }) async {
+
     try {
       await FirebaseAuth.instance.verifyPhoneNumber(
         phoneNumber: phoneNumber,

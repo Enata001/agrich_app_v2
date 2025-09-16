@@ -27,7 +27,6 @@ class AuthRepository {
     String phoneNumber,
   ) async {
     try {
-
       final emailExists = await checkUserExists(email);
       if (emailExists) {
         throw Exception('An account with this email already exists');
@@ -98,6 +97,7 @@ class AuthRepository {
 
       await updateUserProfile(user.uid, {
         'isPhoneVerified': true,
+        'isEmailVerified': true,
         'phoneNumber': user.phoneNumber,
         'accountStatus': 'complete',
         'phoneVerifiedAt': DateTime.now().toIso8601String(),
@@ -147,6 +147,7 @@ class AuthRepository {
 
       await updateUserProfile(user.uid, {
         'isPhoneVerified': true,
+        'isEmailVerified': true,
         'phoneNumber': phoneNumber,
         'accountStatus': 'complete',
         'phoneVerifiedAt': DateTime.now().toIso8601String(),
@@ -289,11 +290,10 @@ class AuthRepository {
 
   Future<SignInMethod> detectSignInMethod(String identifier) async {
     if (identifier.contains('@')) {
-      final userExists = await checkUserExists(identifier);
-      if (!userExists) return SignInMethod.none;
-
       try {
         final querySnapshot = await _firebaseService.getUserByEmail(identifier);
+
+        if (querySnapshot.docs.isEmpty) return SignInMethod.none;
         if (querySnapshot.docs.isNotEmpty) {
           final userData =
               querySnapshot.docs.first.data() as Map<String, dynamic>;
@@ -309,11 +309,9 @@ class AuthRepository {
 
       return SignInMethod.email;
     } else {
-      final phoneExists = await checkPhoneExists(identifier);
-      if (!phoneExists) return SignInMethod.none;
-
       try {
         final querySnapshot = await _firebaseService.getUserByPhone(identifier);
+        if (querySnapshot.docs.isEmpty) return SignInMethod.none;
         if (querySnapshot.docs.isNotEmpty) {
           final userData =
               querySnapshot.docs.first.data() as Map<String, dynamic>;
